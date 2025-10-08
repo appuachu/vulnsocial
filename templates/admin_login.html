@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-form">
+        <h2>Admin Login</h2>
+        <p style="text-align: center; color: #666; margin-bottom: 20px;">
+            Access the admin panel
+        </p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash-message error">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <input type="text" name="username" placeholder="Admin Username" value="" required>
+            <input type="password" name="password" placeholder="Admin Password" value="" required>
+            <button type="submit">Admin Login</button>
+        </form>
+
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #dbdbdb;">
+          
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="{{ url_for('login') }}" style="color: #0095f6; text-decoration: none;">
+                ← Back to User Login
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.flash-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 10px;
+    border-radius: 3px;
+    margin-bottom: 15px;
+    border: 1px solid #f5c6cb;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="search-container">
+    <h2>Search Users</h2>
+
+    <div class="search-box">
+        <form action="{{ url_for('search') }}" method="get">
+            <input type="text" name="q" value="{{ query }}" placeholder="Search for users..." class="search-input">
+            <button type="submit" class="search-btn">Search</button>
+        </form>
+    </div>
+
+    {% if query %}
+    <div class="search-results">
+        <h3>Results for "{{ query }}"</h3>
+
+        {% if users_with_follow_status %}
+        <div class="users-list">
+            {% for user_data in users_with_follow_status %}
+            <div class="user-item">
+                <div class="user-info" onclick="location.href='{{ url_for('user_profile', user_id=user_data.user.id) }}'">
+                    <img src="{{ url_for('static', filename='uploads/' + user_data.user.profile_pic) }}"
+                         alt="{{ user_data.user.username }}"
+                         class="user-avatar"
+                         onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                    <div class="user-details">
+                        <strong class="username">{{ user_data.user.username }}</strong>
+                        <span class="user-bio">{{ user_data.user.bio or "No bio yet" }}</span>
+                        {% if user_data.user.is_private %}
+                            <span class="private-indicator">Private Account</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="user-actions">
+                    {% if user_data.user.id != current_user.id %}
+                        {% if user_data.is_following %}
+                            <a href="{{ url_for('unfollow_user', user_id=user_data.user.id) }}"
+                               class="btn-unfollow"
+                               onclick="return confirm('Unfollow {{ user_data.user.username }}?')">
+                                Unfollow
+                            </a>
+                        {% else %}
+                            {% if user_data.follow_status == 'pending' %}
+                                <span class="btn-pending">Requested</span>
+                            {% else %}
+                                <a href="{{ url_for('follow', user_id=user_data.user.id) }}" class="btn-follow">
+                                    Follow
+                                </a>
+                            {% endif %}
+                        {% endif %}
+                        <a href="{{ url_for('chat') }}?user_id={{ user_data.user.id }}" class="btn-message">
+                            💬 Message
+                        </a>
+                    {% else %}
+                        <span class="btn-own-profile">You</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-results">
+            <p>No users found for "{{ query }}"</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.search-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.search-box {
+    margin-bottom: 25px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #dbdbdb;
+    border-radius: 6px;
+    font-size: 16px;
+}
+
+.search-btn {
+    background: #0095f6;
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.search-results h3 {
+    margin-bottom: 15px;
+    color: #262626;
+}
+
+.users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.user-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border: 1px solid #f0f0f0;
+    border-radius: 10px;
+    background: #fff;
+    transition: background 0.2s ease-in-out;
+}
+
+.user-item:hover {
+    background: #fafafa;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    cursor: pointer;
+}
+
+.user-avatar {
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    font-size: 16px;
+    color: #262626;
+}
+
+.user-bio {
+    font-size: 13px;
+    color: #8e8e8e;
+}
+
+.private-indicator {
+    background: #ffeaa7;
+    color: #2d3436;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    margin-top: 4px;
+}
+
+.user-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-follow, .btn-unfollow, .btn-message, .btn-pending, .btn-own-profile {
+    padding: 8px 14px;
+    border-radius: 5px;
+    font-size: 13px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-follow {
+    background: #0095f6;
+    color: white;
+}
+
+.btn-follow:hover {
+    background: #007acc;
+}
+
+.btn-unfollow {
+    background: white;
+    border: 1px solid #dbdbdb;
+    color: #262626;
+}
+
+.btn-unfollow:hover {
+    background: #f0f0f0;
+}
+
+.btn-message {
+    background: #00b894;
+    color: white;
+}
+
+.btn-message:hover {
+    background: #00a085;
+}
+
+.btn-pending {
+    background: #ffeaa7;
+    color: #2d3436;
+    cursor: default;
+}
+
+.btn-own-profile {
+    background: #0984e3;
+    color: white;
+    cursor: default;
+}
+
+.no-results {
+    text-align: center;
+    padding: 30px;
+    color: #8e8e8e;
+    background: white;
+    border: 1px solid #dbdbdb;
+    border-radius: 10px;
+}
+
+@media (max-width: 768px) {
+    .user-item {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 15px;
+    }
+    .user-actions {
+        flex-direction: row;
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+}
+</style>
+{% endblock %}

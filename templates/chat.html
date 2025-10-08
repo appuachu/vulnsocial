@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-sidebar">
+        <h3>Messages</h3>
+        <div class="chat-users">
+            {% for chat_user in chat_users %}
+            <div class="chat-user-item {% if target_user and target_user.id == chat_user.id %}active{% endif %}"
+                 data-user-id="{{ chat_user.id }}"
+                 onclick="selectUser({{ chat_user.id }}, '{{ chat_user.username }}')">
+                <img src="{{ url_for('static', filename='uploads/' + chat_user.profile_pic) }}"
+                     alt="{{ chat_user.username }}"
+                     class="chat-user-avatar"
+                     onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                <div class="chat-user-info">
+                    <strong>{{ chat_user.username }}</strong>
+                    <span class="last-message">Click to chat</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="chat-main">
+        <div class="chat-header">
+            <h3 id="selectedUserName">
+                {% if target_user %}
+                    Chat with {{ target_user.username }}
+                {% else %}
+                    Select a user to start chatting
+                {% endif %}
+            </h3>
+        </div>
+
+        <div class="messages-container" id="messagesContainer">
+            {% if target_user %}
+                <!-- Messages will be loaded here automatically -->
+            {% else %}
+                <div class="no-chat-selected">
+                    <p>Select a user from the sidebar to start messaging</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="message-input-container" id="messageInputContainer" style="{% if target_user %}display: block;{% else %}display: none;{% endif %}">
+            <form id="messageForm">
+                <input type="hidden" id="receiverId" name="receiver_id" value="{% if target_user %}{{ target_user.id }}{% endif %}">
+                <div class="input-group">
+                    <input type="text" id="messageText" name="text" placeholder="Type a message..." required>
+                    <button type="submit">Send</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedUserId = null;
+let selectedUserName = null;
+
+// Auto-select user if target_user is provided
+document.addEventListener('DOMContentLoaded', function() {
+    {% if target_user %}
+    console.log('Auto-selecting user:', {{ target_user.id }});
+    // Small delay to ensure DOM is fully loaded
+    setTimeout(() => {
+        selectUser({{ target_user.id }}, '{{ target_user.username }}');
+    }, 300);
+    {% endif %}
+});
+
+function selectUser(userId, userName) {
+    console.log('Selecting user:', userId, userName);
+    selectedUserId = userId;
+    selectedUserName = userName;
+
+    // Update UI - remove active class from all users
+    document.querySelectorAll('.chat-user-item').forEach(item => {
+        item.classList.remove('active');
+    });
+
+    // Add active class to selected user
+    const selectedItem = document.querySelector(`.chat-user-item[data-user-id="${userId}"]`);
+    if (selectedItem) {
+        selectedItem.classList.add('active');
+    }
+
+    // Update header and input
+    document.getElementById('selectedUserName').textContent = `Chat with ${userName}`;
+    document.getElementById('receiverId').value = userId;
+    document.getElementById('messageInputContainer').style.display = 'block';
+
+    // Load messages for this user
+    loadMessages(userId);
+}
+
+function loadMessages(receiverId) {
+    console.log('Loading messages for user:', receiverId);
+    fetch(`/get_messages/${receiverId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(messages => {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = '';
+
+            if (messages.length === 0) {
+                container.innerHTML = '<div class="no-messages"><p>No messages yet. Start the conversation!</p></div>';
+                return;
+            }
+
+            messages.forEach(msg => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${msg.is_own ? 'message-sent' : 'message-received'}`;
+                messageDiv.innerHTML = `
+                    <div class="message-content">${msg.text}</div>
+                    <div class="message-time">${msg.created_at}</div>
+                    ${msg.is_own ? `<div class="message-actions" onclick="showMessageActions(${msg.id})">···</div>` : ''}
+                `;
+                container.appendChild(messageDiv);
+            });
+
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        })
+        .catch(error => {
+            console.error('Error loading messages:', error);
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = '<div class="no-messages"><p>Error loading messages</p></div>';
+        });
+}
+
+function showMessageActions(messageId) {
+    const action = prompt('Type "for_me" to delete for yourself, or "for_everyone" to delete for everyone:');
+    if (action && (action === 'for_me' || action === 'for_everyone')) {
+        deleteMessage(messageId, action);
+    }
+}
+
+function deleteMessage(messageId, deleteType) {
+    const formData = new FormData();
+    formData.append('message_id', messageId);
+    formData.append('delete_type', deleteType);
+
+    fetch('/delete_message', {
+        method: 'POST',
+        body: formData
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert('Message deleted');
+              if (selectedUserId) {
+                  loadMessages(selectedUserId);
+              }
+          }
+      });
+}
+
+// Handle message form submission
+document.getElementById('messageForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const messageText = document.getElementById('messageText').value.trim();
+    if (!messageText) return;
+
+    const formData = new FormData(this);
+
+    fetch('/send_message', {
+        method: 'POST',
+        body: formData
+    }).then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              document.getElementById('messageText').value = '';
+              if (selectedUserId) {
+                  // Reload messages to show the new one
+                  setTimeout(() => loadMessages(selectedUserId), 100);
+              }
+          } else {
+              alert('Error sending message: ' + (data.error || 'Unknown error'));
+          }
+      })
+      .catch(error => {
+          console.error('Error:', error);
+          alert('Error sending message');
+      });
+});
+
+// Auto-refresh messages every 3 seconds
+setInterval(() => {
+    if (selectedUserId) {
+        loadMessages(selectedUserId);
+    }
+}, 3000);
+</script>
+
+<style>
+.chat-container {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    height: 80vh;
+    margin: 20px;
+    border: 1px solid #dbdbdb;
+    border-radius: 10px;
+    overflow: hidden;
+    background: white;
+}
+
+.chat-sidebar {
+    background: white;
+    border-right: 1px solid #dbdbdb;
+    overflow-y: auto;
+}
+
+.chat-sidebar h3 {
+    padding: 20px;
+    margin: 0;
+    border-bottom: 1px solid #dbdbdb;
+    background: #fafafa;
+    color: #262626;
+}
+
+.chat-users {
+    padding: 10px;
+}
+
+.chat-user-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-bottom: 5px;
+}
+
+.chat-user-item:hover {
+    background: #f5f5f5;
+}
+
+.chat-user-item.active {
+    background: #0095f6;
+    color: white;
+}
+
+.chat-user-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 12px;
+}
+
+.chat-user-info {
+    flex: 1;
+}
+
+.chat-user-info strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+.last-message {
+    font-size: 12px;
+    color: #8e8e8e;
+}
+
+.chat-user-item.active .last-message {
+    color: #e0e0e0;
+}
+
+.chat-main {
+    display: flex;
+    flex-direction: column;
+    background: white;
+}
+
+.chat-header {
+    padding: 20px;
+    border-bottom: 1px solid #dbdbdb;
+    background: #fafafa;
+}
+
+.chat-header h3 {
+    margin: 0;
+    color: #262626;
+    font-size: 16px;
+}
+
+.messages-container {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #fafafa;
+}
+
+.no-chat-selected, .no-messages {
+    text-align: center;
+    color: #8e8e8e;
+    padding: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.message {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    position: relative;
+    word-wrap: break-word;
+}
+
+.message-sent {
+    align-self: flex-end;
+    background: #0095f6;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.message-received {
+    align-self: flex-start;
+    background: #ffffff;
+    color: #262626;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 4px;
+}
+
+.message-content {
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+.message-time {
+    font-size: 11px;
+    opacity: 0.7;
+    text-align: right;
+}
+
+.message-actions {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.message-input-container {
+    padding: 20px;
+    border-top: 1px solid #dbdbdb;
+    background: white;
+}
+
+.input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.input-group input {
+    flex: 1;
+    padding: 12px 15px;
+    border: 1px solid #dbdbdb;
+    border-radius: 25px;
+    outline: none;
+    font-size: 14px;
+}
+
+.input-group button {
+    background: #0095f6;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.input-group button:hover {
+    background: #007acc;
+}
+
+.input-group button:disabled {
+    background: #b2dffc;
+    cursor: not-allowed;
+}
+</style>
+{% endblock %}

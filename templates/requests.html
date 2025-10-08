@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="requests-container">
+    <!-- Requests Header -->
+    <div class="requests-header">
+        <button class="back-button" onclick="goBack()">
+            <span class="back-icon">‹</span>
+        </button>
+        <h1 class="requests-title">Follow Requests</h1>
+        <div class="header-spacer"></div>
+    </div>
+
+    <!-- Requests List -->
+    <div class="requests-list">
+        {% if requests %}
+            {% for request in requests %}
+            <div class="request-item" data-request-id="{{ request.id }}">
+                <div class="requester-info" onclick="viewProfile({{ request.follower_user.id }})">
+                    <img src="{{ url_for('static', filename='uploads/' + request.follower_user.profile_pic) }}"
+                         alt="{{ request.follower_user.username }}"
+                         class="requester-avatar"
+                         onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                    <div class="requester-details">
+                        <div class="requester-name-row">
+                            <h3 class="requester-name">{{ request.follower_user.username }}</h3>
+                            {% if request.follower_user.is_private %}
+                                <span class="private-indicator">🔒</span>
+                            {% endif %}
+                        </div>
+                        <p class="request-text">Wants to follow you</p>
+                        <span class="request-time">{{ request.created_at.strftime('%b %d, %Y') }}</span>
+                    </div>
+                </div>
+
+                <div class="request-actions">
+                    <button class="btn-accept" onclick="acceptRequest({{ request.id }})">
+                        Accept
+                    </button>
+                    <button class="btn-decline" onclick="declineRequest({{ request.id }})">
+                        Decline
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-requests">
+                <div class="empty-content">
+                    <div class="empty-icon">👥</div>
+                    <h3>No Follow Requests</h3>
+                    <p>When someone requests to follow you, it will appear here.</p>
+                    <button class="btn-explore" onclick="location.href='{{ url_for('search') }}'">
+                        Find people to follow
+                    </button>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.requests-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+}
+
+/* Requests Header */
+.requests-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #dbdbdb;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.back-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.back-button:hover {
+    background: #f0f0f0;
+}
+
+.back-icon {
+    display: block;
+    width: 24px;
+    height: 24px;
+    text-align: center;
+    line-height: 1;
+}
+
+.requests-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #262626;
+    margin: 0;
+}
+
+.header-spacer {
+    width: 40px;
+}
+
+/* Requests List */
+.requests-list {
+    padding: 0;
+}
+
+.request-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid #fafafa;
+    transition: background-color 0.2s;
+}
+
+.request-item:hover {
+    background: #fafafa;
+}
+
+.request-item:last-child {
+    border-bottom: none;
+}
+
+.requester-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    cursor: pointer;
+    min-width: 0;
+}
+
+.requester-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.requester-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.requester-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.requester-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #262626;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.private-indicator {
+    font-size: 12px;
+    color: #8e8e8e;
+}
+
+.request-text {
+    font-size: 13px;
+    color: #8e8e8e;
+    margin: 0 0 4px 0;
+}
+
+.request-time {
+    font-size: 11px;
+    color: #8e8e8e;
+}
+
+.request-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Button Styles */
+.btn-accept, .btn-decline {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-accept {
+    background: #0095f6;
+    color: white;
+}
+
+.btn-accept:hover {
+    background: #007acc;
+}
+
+.btn-decline {
+    background: transparent;
+    color: #262626;
+    border: 1px solid #dbdbdb;
+}
+
+.btn-decline:hover {
+    background: #f0f0f0;
+    border-color: #a8a8a8;
+}
+
+/* Empty State */
+.empty-requests {
+    padding: 80px 20px;
+    text-align: center;
+}
+
+.empty-content {
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.empty-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.empty-content h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #262626;
+    margin: 0 0 8px 0;
+}
+
+.empty-content p {
+    font-size: 14px;
+    color: #8e8e8e;
+    margin: 0 0 20px 0;
+    line-height: 1.4;
+}
+
+.btn-explore {
+    background: #0095f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .requests-container {
+        max-width: 100%;
+    }
+
+    .requests-header {
+        padding: 12px;
+    }
+
+    .request-item {
+        padding: 14px 12px;
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .requester-info {
+        width: 100%;
+    }
+
+    .request-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .btn-accept, .btn-decline {
+        flex: 1;
+        text-align: center;
+        padding: 10px;
+    }
+
+    .requester-avatar {
+        width: 48px;
+        height: 48px;
+    }
+
+    .empty-requests {
+        padding: 60px 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .requests-header {
+        padding: 8px 12px;
+    }
+
+    .request-item {
+        padding: 12px;
+    }
+
+    .requester-avatar {
+        width: 44px;
+        height: 44px;
+    }
+
+    .requester-name {
+        font-size: 13px;
+    }
+
+    .request-text {
+        font-size: 12px;
+    }
+}
+
+/* Animations */
+.request-item {
+    animation: requestSlide 0.3s ease-out;
+}
+
+@keyframes requestSlide {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Removal Animation */
+.request-item.removing {
+    opacity: 0;
+    transform: translateX(-100%);
+    transition: all 0.3s ease-in-out;
+}
+</style>
+
+<script>
+function goBack() {
+    window.history.back();
+}
+
+function viewProfile(userId) {
+    window.location.href = `/user/${userId}`;
+}
+
+function acceptRequest(requestId) {
+    const requestItem = document.querySelector(`[data-request-id="${requestId}"]`);
+    if (requestItem) {
+        requestItem.classList.add('removing');
+        setTimeout(() => {
+            window.location.href = `/accept_request/${requestId}`;
+        }, 300);
+    }
+}
+
+function declineRequest(requestId) {
+    if (confirm('Are you sure you want to decline this follow request?')) {
+        const requestItem = document.querySelector(`[data-request-id="${requestId}"]`);
+        if (requestItem) {
+            requestItem.classList.add('removing');
+            setTimeout(() => {
+                window.location.href = `/reject_request/${requestId}`;
+            }, 300);
+        }
+    }
+}
+
+// Add smooth transitions
+document.addEventListener('DOMContentLoaded', function() {
+    const requestItems = document.querySelectorAll('.request-item');
+    requestItems.forEach((item, index) => {
+        item.style.animationDelay = `${index * 0.05}s`;
+    });
+});
+
+// Auto-refresh requests (optional)
+setInterval(() => {
+    // You can implement auto-refresh here if needed
+}, 30000); // Refresh every 30 seconds
+</script>
+{% endblock %}

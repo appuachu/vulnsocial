@@ -1,0 +1,595 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="settings-container">
+    <!-- Settings Header -->
+    <div class="settings-header">
+        <button class="back-button" onclick="goBack()">
+            <span class="back-icon">‹</span>
+        </button>
+        <h1 class="settings-title">Settings</h1>
+        <div class="header-spacer"></div>
+    </div>
+
+    <div class="settings-content">
+        <!-- Account Settings -->
+        <div class="settings-section">
+            <h2 class="section-title">Account</h2>
+            <div class="settings-list">
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <span class="setting-label">Private Account</span>
+                        <span class="setting-description">Only your followers can see your posts</span>
+                    </div>
+                    <form method="POST" class="toggle-form">
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="is_private" {% if user.is_private %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </form>
+                </div>
+
+                <div class="setting-item clickable" onclick="location.href='{{ url_for('profile') }}'">
+                    <div class="setting-info">
+                        <span class="setting-label">Edit Profile</span>
+                        <span class="setting-description">Change your profile information</span>
+                    </div>
+                    <span class="setting-arrow">›</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security -->
+        <div class="settings-section">
+            <h2 class="section-title">Security</h2>
+            <div class="settings-list">
+                <div class="setting-item" onclick="showPasswordModal()">
+                    <div class="setting-info">
+                        <span class="setting-label">Change Password</span>
+                        <span class="setting-description">Update your password regularly</span>
+                    </div>
+                    <span class="setting-arrow">›</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Privacy -->
+        <div class="settings-section">
+            <h2 class="section-title">Privacy</h2>
+            <div class="settings-list">
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <span class="setting-label">Profile Views</span>
+                        <span class="setting-description">Users who viewed your profile</span>
+                    </div>
+                    <span class="setting-badge">{{ profile_views|length }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Profile Views -->
+        {% if profile_views %}
+        <div class="settings-section">
+            <h2 class="section-title">Recent Profile Views</h2>
+            <div class="profile-views-list">
+                {% for viewer in profile_views %}
+                <div class="viewer-item">
+                    <div class="viewer-avatar">👤</div>
+                    <span class="viewer-name">{{ viewer }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Security Testing Section -->
+        <div class="settings-section security-testing">
+            <h2 class="section-title">Security Testing</h2>
+            <div class="settings-list">
+                <div class="setting-item">
+                    <div class="setting-info">
+                        <span class="setting-label">IDOR Vulnerability Demo</span>
+                        <span class="setting-description">View any user's information by ID</span>
+                    </div>
+                    <button class="btn-test" onclick="showIDORModal()">Test</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logout -->
+        <div class="settings-section">
+            <div class="settings-list">
+                <div class="setting-item logout-item" onclick="confirmLogout()">
+                    <span class="setting-label logout-label">Log Out</span>
+                    <span class="setting-arrow">›</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Password Change Modal -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content settings-modal">
+        <div class="modal-header">
+            <h3>Change Password</h3>
+            <span class="close" onclick="closePasswordModal()">&times;</span>
+        </div>
+        <form method="POST" class="password-form">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="current_password">Current Password</label>
+                    <input type="password" id="current_password" name="current_password" required class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="new_password">New Password</label>
+                    <input type="password" id="new_password" name="new_password" required class="form-input" minlength="6">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closePasswordModal()">Cancel</button>
+                <button type="submit" class="btn-save">Change Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- IDOR Test Modal -->
+<div id="idorModal" class="modal">
+    <div class="modal-content settings-modal">
+        <div class="modal-header">
+            <h3>IDOR Vulnerability Test</h3>
+            <span class="close" onclick="closeIDORModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="user_id">Enter User ID</label>
+                <input type="number" id="user_id" placeholder="Enter any user ID" min="1" class="form-input">
+                <small class="form-help">This demonstrates an Insecure Direct Object Reference vulnerability</small>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-cancel" onclick="closeIDORModal()">Cancel</button>
+            <button type="button" class="btn-test" onclick="viewUserInfo()">View User Info</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.settings-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+}
+
+/* Settings Header */
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #dbdbdb;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.back-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.back-button:hover {
+    background: #f0f0f0;
+}
+
+.back-icon {
+    display: block;
+    width: 24px;
+    height: 24px;
+    text-align: center;
+    line-height: 1;
+}
+
+.settings-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #262626;
+    margin: 0;
+}
+
+.header-spacer {
+    width: 40px;
+}
+
+/* Settings Content */
+.settings-content {
+    padding: 0;
+}
+
+.settings-section {
+    margin-bottom: 0;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #262626;
+    padding: 20px 16px 12px;
+    margin: 0;
+    background: #fafafa;
+}
+
+.settings-list {
+    background: white;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid #fafafa;
+    transition: background-color 0.2s;
+}
+
+.setting-item.clickable:hover {
+    background: #fafafa;
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+.setting-info {
+    flex: 1;
+}
+
+.setting-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #262626;
+    margin-bottom: 2px;
+}
+
+.setting-description {
+    display: block;
+    font-size: 12px;
+    color: #8e8e8e;
+}
+
+.setting-arrow {
+    font-size: 18px;
+    color: #8e8e8e;
+    margin-left: 8px;
+}
+
+.setting-badge {
+    background: #0095f6;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 24px;
+    text-align: center;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #dbdbdb;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+    background-color: #0095f6;
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+/* Profile Views */
+.profile-views-list {
+    background: white;
+    padding: 0 16px;
+}
+
+.viewer-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #fafafa;
+}
+
+.viewer-item:last-child {
+    border-bottom: none;
+}
+
+.viewer-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.viewer-name {
+    font-size: 14px;
+    color: #262626;
+    font-weight: 500;
+}
+
+/* Security Testing */
+.security-testing {
+    border-top: 1px solid #dbdbdb;
+}
+
+.btn-test {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.btn-test:hover {
+    background: #c0392b;
+}
+
+/* Logout */
+.logout-item {
+    border-top: 1px solid #dbdbdb;
+    margin-top: 8px;
+}
+
+.logout-label {
+    color: #ed4956;
+}
+
+/* Modal Styles */
+.settings-modal {
+    max-width: 400px;
+    border-radius: 12px;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #262626;
+    margin-bottom: 6px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #dbdbdb;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #262626;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.form-input:focus {
+    border-color: #0095f6;
+}
+
+.form-help {
+    display: block;
+    font-size: 12px;
+    color: #8e8e8e;
+    margin-top: 4px;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 16px 20px;
+    border-top: 1px solid #dbdbdb;
+}
+
+.btn-cancel {
+    background: #f8f9fa;
+    color: #262626;
+    border: 1px solid #dbdbdb;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.btn-cancel:hover {
+    background: #e9ecef;
+}
+
+.btn-save {
+    background: #0095f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.btn-save:hover {
+    background: #007acc;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .settings-container {
+        max-width: 100%;
+    }
+
+    .settings-header {
+        padding: 12px;
+    }
+
+    .section-title {
+        padding: 16px 12px 8px;
+    }
+
+    .setting-item {
+        padding: 14px 12px;
+    }
+
+    .profile-views-list {
+        padding: 0 12px;
+    }
+
+    .settings-modal {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .settings-header {
+        padding: 8px 12px;
+    }
+
+    .setting-item {
+        padding: 12px;
+    }
+
+    .modal-body {
+        padding: 16px;
+    }
+
+    .modal-footer {
+        padding: 12px 16px;
+    }
+}
+</style>
+
+<script>
+function goBack() {
+    window.history.back();
+}
+
+// Password Modal
+function showPasswordModal() {
+    document.getElementById('passwordModal').style.display = 'block';
+}
+
+function closePasswordModal() {
+    document.getElementById('passwordModal').style.display = 'none';
+}
+
+// IDOR Modal
+function showIDORModal() {
+    document.getElementById('idorModal').style.display = 'block';
+}
+
+function closeIDORModal() {
+    document.getElementById('idorModal').style.display = 'none';
+}
+
+function viewUserInfo() {
+    const userId = document.getElementById('user_id').value;
+    if (userId) {
+        // VULNERABILITY: Direct access to user data without authorization
+        window.location.href = `/user/${userId}`;
+    } else {
+        alert('Please enter a user ID');
+    }
+}
+
+// Logout Confirmation
+function confirmLogout() {
+    if (confirm('Are you sure you want to log out?')) {
+        window.location.href = "{{ url_for('logout') }}";
+    }
+}
+
+// Close modals when clicking outside
+window.addEventListener('click', function(e) {
+    const passwordModal = document.getElementById('passwordModal');
+    const idorModal = document.getElementById('idorModal');
+
+    if (e.target === passwordModal) {
+        closePasswordModal();
+    }
+    if (e.target === idorModal) {
+        closeIDORModal();
+    }
+});
+
+// Form validation
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordForm = document.querySelector('.password-form');
+    if (passwordForm) {
+        passwordForm.addEventListener('submit', function(e) {
+            const newPassword = document.getElementById('new_password').value;
+            if (newPassword.length < 6) {
+                e.preventDefault();
+                alert('Password must be at least 6 characters long');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

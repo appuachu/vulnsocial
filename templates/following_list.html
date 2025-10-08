@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="list-container">
+    <div class="list-header">
+        <div class="header-back">
+            <a href="{{ url_for('profile') }}" class="back-btn">←</a>
+            <h2>Following</h2>
+        </div>
+    </div>
+
+    <div class="users-list">
+        {% for user_data in users_with_follow %}
+        {% set following_user = user_data[0] %}
+        {% set follow_data = user_data[1] %}
+        <div class="user-item">
+            <div class="user-info">
+                <img src="{{ url_for('static', filename='uploads/' + following_user.profile_pic) }}"
+                     alt="{{ following_user.username }}"
+                     class="user-avatar"
+                     onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                <div class="user-details">
+                    <strong class="username">{{ following_user.username }}</strong>
+                    <span class="user-bio">{{ following_user.bio or "No bio yet" }}</span>
+                </div>
+            </div>
+
+            <div class="user-actions">
+                {% if current_user.id == profile_user.id %}
+                    <!-- Unfollow option (only shown to profile owner) -->
+                    <a href="{{ url_for('unfollow_user', user_id=following_user.id) }}"
+                       class="btn-unfollow"
+                       onclick="return confirm('Unfollow {{ following_user.username }}?')">
+                        Unfollow
+                    </a>
+                {% else %}
+                    <!-- Follow/Unfollow buttons for current user viewing someone else's following -->
+                    {% set is_following = Follow.query.filter_by(follower_id=current_user.id, following_id=following_user.id, status='accepted').first() %}
+                    {% if is_following %}
+                        <a href="{{ url_for('unfollow_user', user_id=following_user.id) }}"
+                           class="btn-unfollow"
+                           onclick="return confirm('Unfollow {{ following_user.username }}?')">
+                            Unfollow
+                        </a>
+                    {% else %}
+                        {% set is_pending = Follow.query.filter_by(follower_id=current_user.id, following_id=following_user.id, status='pending').first() %}
+                        {% if is_pending %}
+                            <span class="btn-pending">Requested</span>
+                        {% else %}
+                            <a href="{{ url_for('follow', user_id=following_user.id) }}" class="btn-follow">
+                                Follow
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="no-users">
+            <p>Not following anyone yet</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Same CSS as followers_list.html -->
+<style>
+.list-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;
+}
+
+.list-header {
+    padding: 16px;
+    border-bottom: 1px solid #dbdbdb;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.header-back {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.back-btn {
+    color: #262626;
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.header-back h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.users-list {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.user-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.user-item:hover {
+    background: #fafafa;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.user-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    font-size: 14px;
+    color: #262626;
+    font-weight: 600;
+}
+
+.user-bio {
+    font-size: 12px;
+    color: #8e8e8e;
+    margin-top: 2px;
+}
+
+.user-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-unfollow, .btn-follow, .btn-pending {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-unfollow {
+    background: transparent;
+    color: #262626;
+    border: 1px solid #dbdbdb;
+}
+
+.btn-unfollow:hover {
+    background: #f0f0f0;
+}
+
+.btn-follow {
+    background: #0095f6;
+    color: white;
+}
+
+.btn-follow:hover {
+    background: #007acc;
+}
+
+.btn-pending {
+    background: transparent;
+    color: #8e8e8e;
+    border: 1px solid #dbdbdb;
+    cursor: default;
+}
+
+.no-users {
+    text-align: center;
+    padding: 40px;
+    color: #8e8e8e;
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.clickable:hover {
+    color: #0095f6;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="followers-container">
+    <div class="followers-header">
+        <a href="{{ url_for('user_profile', user_id=profile_user.id) }}" class="back-btn">‹</a>
+        <h3>Followers</h3>
+    </div>
+
+    <div class="followers-list">
+        {% if followers %}
+            {% for follower in followers %}
+            <div class="follower-item">
+                <div class="user-info" onclick="location.href='{{ url_for('user_profile', user_id=follower.id) }}'">
+                    <img src="{{ url_for('static', filename='uploads/' + follower.profile_pic) }}"
+                         alt="{{ follower.username }}"
+                         class="user-avatar"
+                         onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                    <div class="user-details">
+                        <strong class="username">{{ follower.username }}</strong>
+                        <span class="user-bio">{{ follower.bio or "No bio yet" }}</span>
+                    </div>
+                </div>
+
+                <div class="user-actions">
+                    {% if follower.id != current_user.id %}
+                        {% if follower.id in current_user_following_ids %}
+                            <a href="{{ url_for('unfollow_user', user_id=follower.id) }}"
+                               class="btn-unfollow"
+                               onclick="return confirm('Unfollow {{ follower.username }}?')">
+                                Unfollow
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('follow', user_id=follower.id) }}" class="btn-follow">
+                                Follow
+                            </a>
+                        {% endif %}
+                    {% else %}
+                        <span class="btn-own-profile">You</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-followers">
+                <p>No followers yet</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.followers-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+}
+
+.followers-header {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #dbdbdb;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.back-btn {
+    font-size: 24px;
+    color: #262626;
+    text-decoration: none;
+    margin-right: 16px;
+}
+
+.followers-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.followers-list {
+    padding: 16px;
+}
+
+.follower-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    cursor: pointer;
+}
+
+.user-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    font-size: 14px;
+    color: #262626;
+    font-weight: 600;
+}
+
+.user-bio {
+    font-size: 12px;
+    color: #8e8e8e;
+}
+
+.user-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-follow, .btn-unfollow, .btn-own-profile {
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 12px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-follow {
+    background: #0095f6;
+    color: white;
+}
+
+.btn-follow:hover {
+    background: #007acc;
+}
+
+.btn-unfollow {
+    background: white;
+    border: 1px solid #dbdbdb;
+    color: #262626;
+}
+
+.btn-unfollow:hover {
+    background: #f0f0f0;
+}
+
+.btn-own-profile {
+    background: #0984e3;
+    color: white;
+    cursor: default;
+}
+
+.no-followers {
+    text-align: center;
+    padding: 60px 20px;
+    color: #8e8e8e;
+}
+
+@media (max-width: 768px) {
+    .follower-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .user-actions {
+        align-self: flex-end;
+    }
+}
+</style>
+{% endblock %}

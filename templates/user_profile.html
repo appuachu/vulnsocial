@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-header">
+        <div class="profile-picture-section">
+            <img src="{{ url_for('static', filename='uploads/' + profile_user.profile_pic) }}"
+                 alt="Profile Picture" class="profile-large-pic"
+                 onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+        </div>
+        <div class="profile-info-section">
+            <div class="profile-username">
+                <h2>{{ profile_user.username }}</h2>
+                {% if profile_user.is_private %}
+                    <span class="private-badge">Private</span>
+                {% endif %}
+
+                <div class="profile-actions">
+                    {% if not is_own_profile %}
+                        {% if is_following %}
+                            <a href="{{ url_for('unfollow_user', user_id=profile_user.id) }}"
+                               class="btn-unfollow"
+                               onclick="return confirm('Unfollow {{ profile_user.username }}?')">
+                                Unfollow
+                            </a>
+                        {% else %}
+                            {% if is_pending %}
+                                <span class="btn-pending">Requested</span>
+                            {% else %}
+                                <a href="{{ url_for('follow', user_id=profile_user.id) }}" class="btn-follow">
+                                    Follow
+                                </a>
+                            {% endif %}
+                        {% endif %}
+
+                        <!-- Message Button -->
+                        <a href="{{ url_for('chat') }}?user_id={{ profile_user.id }}" class="btn-message">
+                            Message
+                        </a>
+                    {% else %}
+                        <button class="btn-edit-profile" onclick="location.href='{{ url_for('profile') }}'">
+                            Edit Profile
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="profile-stats">
+                <div class="stat clickable" onclick="location.href='{{ url_for('followers_list', user_id=profile_user.id) }}'">
+                    <strong>{{ followers_count }}</strong>
+                    <span>posts</span>
+                </div>
+                <div class="stat clickable" onclick="location.href='{{ url_for('followers_list', user_id=profile_user.id) }}'">
+                    <strong>{{ followers_count }}</strong>
+                    <span>followers</span>
+                </div>
+                <div class="stat clickable" onclick="location.href='{{ url_for('following_list', user_id=profile_user.id) }}'">
+                    <strong>{{ following_count }}</strong>
+                    <span>following</span>
+                </div>
+            </div>
+
+            <div class="profile-bio">
+                <p>{{ profile_user.bio or "No bio yet." }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Posts Section -->
+    <div class="profile-posts-section">
+        {% if can_view %}
+            <h3>Posts ({{ posts_with_counts|length }})</h3>
+            {% if posts_with_counts %}
+            <div class="posts-grid">
+                {% for post_data in posts_with_counts %}
+                <div class="post-thumbnail">
+                    <img src="{{ url_for('static', filename='uploads/' + post_data.post.image_path) }}"
+                         alt="Post"
+                         onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+
+                    <a href="{{ url_for('view_comments', post_id=post_data.post.id) }}" class="post-overlay-link">
+                        <div class="post-overlay">
+                            <span class="post-likes">❤️ {{ post_data.like_count }}</span>
+                            <span class="post-comments">💬 {{ post_data.comment_count }}</span>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="no-posts">
+                <p>{{ profile_user.username }} hasn't posted anything yet.</p>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="private-profile">
+                <div class="private-content">
+                    <div class="private-icon">🔒</div>
+                    <h3>This account is private</h3>
+                    <p>Follow this account to see their photos and videos.</p>
+                    {% if is_pending %}
+                        <span class="btn-pending">Requested</span>
+                    {% else %}
+                        <a href="{{ url_for('follow', user_id=profile_user.id) }}" class="btn-follow">
+                            Follow
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.profile-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.profile-header {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 40px;
+    padding: 30px;
+    background: white;
+    border: 1px solid #dbdbdb;
+    border-radius: 10px;
+}
+
+.profile-large-pic {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #0095f6;
+}
+
+.profile-info-section {
+    flex: 1;
+}
+
+.profile-username {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.profile-username h2 {
+    margin: 0;
+    color: #262626;
+}
+
+.private-badge {
+    background: #fdcb6e;
+    color: #2d3436;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.profile-actions {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+}
+
+/* Button Styles */
+.btn-follow, .btn-unfollow, .btn-message, .btn-edit-profile, .btn-pending {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.btn-follow {
+    background: #0095f6;
+    color: white;
+}
+
+.btn-follow:hover {
+    background: #007acc;
+}
+
+.btn-unfollow {
+    background: transparent;
+    color: #262626;
+    border: 1px solid #dbdbdb;
+}
+
+.btn-unfollow:hover {
+    background: #f0f0f0;
+}
+
+.btn-message {
+    background: transparent;
+    color: #262626;
+    border: 1px solid #dbdbdb;
+}
+
+.btn-message:hover {
+    background: #f0f0f0;
+}
+
+.btn-edit-profile {
+    background: transparent;
+    color: #262626;
+    border: 1px solid #dbdbdb;
+}
+
+.btn-edit-profile:hover {
+    background: #fafafa;
+}
+
+.btn-pending {
+    background: transparent;
+    color: #8e8e8e;
+    border: 1px solid #dbdbdb;
+    cursor: default;
+}
+
+.profile-stats {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+.stat {
+    text-align: center;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.stat.clickable:hover {
+    color: #0095f6;
+}
+
+.stat strong {
+    display: block;
+    font-size: 18px;
+    color: #262626;
+}
+
+.stat span {
+    font-size: 14px;
+    color: #8e8e8e;
+}
+
+.profile-bio {
+    margin-bottom: 20px;
+}
+
+.profile-bio p {
+    margin: 0;
+    color: #262626;
+    line-height: 1.4;
+}
+
+/* Posts Section */
+.profile-posts-section {
+    background: white;
+    padding: 30px;
+    border: 1px solid #dbdbdb;
+    border-radius: 10px;
+}
+
+.posts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.post-thumbnail {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 5px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.post-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+}
+
+.post-thumbnail:hover img {
+    transform: scale(1.05);
+}
+
+.post-overlay-link {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    text-decoration: none;
+    display: block;
+}
+
+.post-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    color: white;
+    font-weight: bold;
+}
+
+.post-thumbnail:hover .post-overlay {
+    opacity: 1;
+}
+
+/* Private Profile Styling */
+.private-profile {
+    text-align: center;
+    padding: 60px 40px;
+}
+
+.private-content {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.private-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+}
+
+.private-content h3 {
+    margin: 0 0 12px 0;
+    color: #262626;
+}
+
+.private-content p {
+    margin: 0 0 24px 0;
+    color: #8e8e8e;
+}
+
+.no-posts {
+    text-align: center;
+    padding: 40px;
+    color: #8e8e8e;
+}
+
+@media (max-width: 768px) {
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 20px;
+    }
+
+    .profile-username {
+        justify-content: center;
+    }
+
+    .profile-actions {
+        margin-left: 0;
+        justify-content: center;
+    }
+
+    .profile-stats {
+        justify-content: center;
+    }
+
+    .posts-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+</style>
+{% endblock %}

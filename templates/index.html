@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="instagram-container">
+    <!-- Stories Section -->
+    <div class="stories-section">
+        <div class="stories-container">
+            <!-- Add story button -->
+            <div class="story-item">
+                <div class="story-avatar your-story">
+                    <img src="{{ url_for('static', filename='uploads/' + user.profile_pic) }}"
+                         alt="Your story"
+                         onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                    <div class="add-story">+</div>
+                </div>
+                <span>Your story</span>
+            </div>
+
+            <!-- Other stories would go here -->
+        </div>
+    </div>
+
+    <!-- Create Post Modal -->
+    <div id="createPostModal" class="modal">
+        <div class="modal-content instagram-modal">
+            <div class="modal-header">
+                <h3>Create new post</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="createPostForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="upload-section">
+                        <div class="upload-icon">📷</div>
+                        <h4>Upload photos and videos here</h4>
+                        <input type="file" id="postImage" name="image" accept="image/*" required hidden>
+                        <button type="button" class="btn-select" onclick="document.getElementById('postImage').click()">
+                            Select from computer
+                        </button>
+                    </div>
+                    <div class="preview-section" id="previewSection" style="display: none;">
+                        <img id="imagePreview" src="" alt="Preview">
+                        <div class="caption-section">
+                            <textarea name="caption" placeholder="Write a caption..." maxlength="500"></textarea>
+                            <div class="char-count">0/500</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-cancel">Cancel</button>
+                    <button type="submit" class="btn-share" disabled>Share</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Posts Feed -->
+    <div class="posts-feed">
+        {% if posts %}
+            {% for post in posts %}
+            <div class="post-card">
+                <!-- Post Header -->
+                <div class="post-header">
+                    <div class="post-user">
+                        <img src="{{ url_for('static', filename='uploads/' + post.user.profile_pic) }}"
+                             alt="{{ post.user.username }}"
+                             onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                        <span class="username">{{ post.user.username }}</span>
+                        {% if not post.is_active %}
+                            <span class="post-disabled-badge">Disabled</span>
+                        {% endif %}
+                    </div>
+                    <div class="post-options">
+                        <span class="options-dots">⋯</span>
+                    </div>
+                </div>
+
+                <!-- Post Image -->
+                <div class="post-image">
+                    <img src="{{ url_for('static', filename='uploads/' + post.image_path) }}"
+                         alt="Post"
+                         onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+                </div>
+
+                <!-- Post Actions -->
+                <div class="post-actions">
+                    <div class="action-buttons">
+                        <button class="action-btn like-btn" data-post-id="{{ post.id }}">
+                            <span class="like-icon">❤️</span>
+                        </button>
+                        <button class="action-btn comment-btn" onclick="location.href='{{ url_for('view_comments', post_id=post.id) }}'">
+                            <span class="comment-icon">💬</span>
+                        </button>
+                        <button class="action-btn share-btn">
+                            <span class="share-icon">📤</span>
+                        </button>
+                    </div>
+                    <button class="action-btn save-btn">
+                        <span class="save-icon">🔖</span>
+                    </button>
+                </div>
+
+                <!-- Post Stats -->
+                <div class="post-stats">
+                    <span class="likes-count">{{ post.likes|length }} likes</span>
+                    <span class="post-time">{{ post.created_at.strftime('%B %d, %Y') }}</span>
+                </div>
+
+                <!-- Post Caption -->
+                <div class="post-caption">
+                    <strong>{{ post.user.username }}</strong> {{ post.caption }}
+                </div>
+
+                <!-- View Comments -->
+                <div class="view-comments">
+                    <a href="{{ url_for('view_comments', post_id=post.id) }}" class="view-comments-link">
+                        View all {{ post.comments|length }} comments
+                    </a>
+                </div>
+
+                <!-- Add Comment -->
+                <form class="add-comment-form" data-post-id="{{ post.id }}">
+                    <input type="text" placeholder="Add a comment..." class="comment-input">
+                    <button type="submit" class="comment-post-btn" disabled>Post</button>
+                </form>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-posts">
+                <div class="no-posts-content">
+                    <h3>No posts yet</h3>
+                    <p>When people you follow post, you'll see their photos and videos here.</p>
+                    <button class="btn-find-people" onclick="location.href='{{ url_for('search') }}'">
+                        Find people to follow
+                    </button>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Floating Action Button for Create Post -->
+<button class="fab" onclick="openCreatePostModal()">
+    <span>+</span>
+</button>
+
+<script>
+
+  // Like functionality
+document.querySelectorAll('.like-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const postId = this.dataset.postId;
+
+        fetch(`/like_post/${postId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.classList.toggle('liked', data.liked);
+
+                    // Update like count display
+                    const likesElement = this.closest('.post-card').querySelector('.likes-count');
+                    if (likesElement) {
+                        likesElement.textContent = `${data.like_count} likes`;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error liking post:', error);
+            });
+    });
+});
+function openCreatePostModal() {
+    document.getElementById('createPostModal').style.display = 'block';
+}
+
+function closeCreatePostModal() {
+    document.getElementById('createPostModal').style.display = 'none';
+    document.getElementById('previewSection').style.display = 'none';
+    document.getElementById('createPostForm').reset();
+}
+
+// Image preview
+document.getElementById('postImage').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('imagePreview').src = e.target.result;
+            document.getElementById('previewSection').style.display = 'block';
+            document.querySelector('.upload-section').style.display = 'none';
+            document.querySelector('.btn-share').disabled = false;
+        }
+        reader.readAsDataURL(file);
+    }
+});
+
+// Character count for caption
+document.querySelector('textarea[name="caption"]').addEventListener('input', function(e) {
+    const count = e.target.value.length;
+    document.querySelector('.char-count').textContent = `${count}/500`;
+});
+
+// Form submission
+document.getElementById('createPostForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+
+    fetch('/create_post', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeCreatePostModal();
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+});
+
+// Close modal when clicking X or outside
+document.querySelector('.close').addEventListener('click', closeCreatePostModal);
+document.querySelector('.btn-cancel').addEventListener('click', closeCreatePostModal);
+window.addEventListener('click', function(e) {
+    if (e.target === document.getElementById('createPostModal')) {
+        closeCreatePostModal();
+    }
+});
+
+// Like functionality
+document.querySelectorAll('.like-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const postId = this.dataset.postId;
+        // Add like functionality here
+        this.classList.toggle('liked');
+    });
+});
+</script>
+
+<style>
+.instagram-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px 0;
+}
+
+/* Stories Section */
+.stories-section {
+    background: white;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+}
+
+.stories-container {
+    display: flex;
+    gap: 16px;
+}
+
+.story-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.story-avatar {
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+    padding: 2px;
+    position: relative;
+}
+
+.story-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 2px solid white;
+    object-fit: cover;
+}
+
+.your-story .story-avatar {
+    background: #dbdbdb;
+}
+
+.add-story {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #0095f6;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    border: 2px solid white;
+}
+
+.story-item span {
+    font-size: 12px;
+    color: #262626;
+}
+
+/* Posts Feed */
+.posts-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.post-card {
+    background: white;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;
+}
+
+.post-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+}
+
+.post-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.post-user img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.username {
+    font-weight: 600;
+    color: #262626;
+}
+
+.post-disabled-badge {
+    background: #ff7675;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.options-dots {
+    font-size: 20px;
+    color: #262626;
+    cursor: pointer;
+}
+
+.post-image img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.post-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 16px;
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 24px;
+    padding: 0;
+}
+
+.like-btn.liked .like-icon {
+    color: #ed4956;
+}
+
+.post-stats {
+    padding: 0 16px 8px;
+}
+
+.likes-count {
+    font-weight: 600;
+    color: #262626;
+    font-size: 14px;
+}
+
+.post-time {
+    color: #8e8e8e;
+    font-size: 10px;
+    text-transform: uppercase;
+    margin-left: 8px;
+}
+
+.post-caption {
+    padding: 0 16px 8px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.view-comments {
+    padding: 0 16px 8px;
+}
+
+.view-comments-link {
+    color: #8e8e8e;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.add-comment-form {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-top: 1px solid #efefef;
+}
+
+.comment-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    padding: 8px 0;
+}
+
+.comment-post-btn {
+    background: none;
+    border: none;
+    color: #0095f6;
+    font-weight: 600;
+    cursor: pointer;
+    opacity: 0.3;
+}
+
+.comment-post-btn:not(:disabled) {
+    opacity: 1;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.instagram-modal {
+    background-color: white;
+    margin: 5% auto;
+    border-radius: 12px;
+    width: 80%;
+    max-width: 500px;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #dbdbdb;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.close {
+    color: #262626;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.modal-body {
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.upload-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.upload-section h4 {
+    margin: 0 0 20px 0;
+    color: #262626;
+    font-weight: 300;
+}
+
+.btn-select {
+    background: #0095f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.preview-section {
+    text-align: left;
+}
+
+#imagePreview {
+    width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    margin-bottom: 16px;
+}
+
+.caption-section {
+    position: relative;
+}
+
+.caption-section textarea {
+    width: 100%;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;
+    padding: 12px;
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+}
+
+.char-count {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    color: #8e8e8e;
+    font-size: 12px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 16px;
+    border-top: 1px solid #dbdbdb;
+}
+
+.btn-cancel {
+    background: none;
+    border: none;
+    color: #262626;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-share {
+    background: #0095f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-share:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Floating Action Button */
+.fab {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* No Posts State */
+.no-posts {
+    background: white;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;
+    padding: 60px 40px;
+    text-align: center;
+}
+
+.no-posts-content h3 {
+    margin: 0 0 12px 0;
+    color: #262626;
+}
+
+.no-posts-content p {
+    margin: 0 0 24px 0;
+    color: #8e8e8e;
+}
+
+.btn-find-people {
+    background: #0095f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+</style>
+{% endblock %}

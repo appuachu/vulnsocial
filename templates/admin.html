@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>Admin Panel</h2>
+        <div class="admin-actions">
+            <a href="{{ url_for('admin_logout') }}" class="btn-logout">Admin Logout</a>
+            <a href="{{ url_for('logout') }}" class="btn-logout">Full Logout</a>
+        </div>
+    </div>
+
+    <div class="admin-nav">
+        <a href="{{ url_for('admin') }}" class="admin-nav-btn active">Manage Users</a>
+        <a href="{{ url_for('admin_user_chats') }}" class="admin-nav-btn">View Chats</a>
+        <a href="{{ url_for('index') }}" class="admin-nav-btn">Back to App</a>
+    </div>
+
+    <div class="admin-section">
+        <h3>User Management</h3>
+
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Mobile</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.mobile }}</td>
+                    <td>
+                        {% if user.is_admin %}
+                            <span class="status-admin">Admin</span>
+                        {% else %}
+                            <span class="status-{{ 'private' if user.is_private else 'public' }}">
+                                {{ 'Private' if user.is_private else 'Public' }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="action-buttons">
+                        {% if not user.is_admin %}
+                            <button onclick="showResetPassword({{ user.id }}, '{{ user.username }}')"
+                                    class="btn-reset">Reset Password</button>
+                            <a href="{{ url_for('admin_toggle_user_status', user_id=user.id) }}"
+                               class="btn-toggle">Toggle Privacy</a>
+                            <a href="{{ url_for('admin_delete_user', user_id=user.id) }}"
+                               class="btn-delete"
+                               onclick="return confirm('Delete user {{ user.username }}?')">Delete</a>
+                            <a href="{{ url_for('admin_user_chats') }}?user_id={{ user.id }}"
+                               class="btn-chats">View Chats</a>
+                        {% else %}
+                            <span class="no-actions">Admin Account</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Password Reset Modal -->
+<div id="passwordModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h3>Reset Password for <span id="usernameSpan"></span></h3>
+        <form id="resetForm" method="POST">
+            <input type="password" id="newPassword" name="new_password" placeholder="New Password" required>
+            <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+            <button type="submit" class="btn-confirm">Reset Password</button>
+            <button type="button" onclick="closeModal()" class="btn-cancel">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<script>
+let currentUserId = null;
+
+function showResetPassword(userId, username) {
+    currentUserId = userId;
+    document.getElementById('usernameSpan').textContent = username;
+    document.getElementById('passwordModal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('passwordModal').style.display = 'none';
+    currentUserId = null;
+}
+
+document.getElementById('resetForm').onsubmit = function(e) {
+    e.preventDefault();
+
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (newPassword !== confirmPassword) {
+        alert('Passwords do not match!');
+        return false;
+    }
+
+    if (newPassword.length < 3) {
+        alert('Password must be at least 3 characters long!');
+        return false;
+    }
+
+    this.action = '/admin/reset_password/' + currentUserId;
+    this.submit();
+};
+
+window.onclick = function(event) {
+    const modal = document.getElementById('passwordModal');
+    if (event.target === modal) {
+        closeModal();
+    }
+};
+</script>
+
+<style>
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.btn-logout {
+    background: #e74c3c;
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    border-radius: 3px;
+    font-size: 14px;
+    margin-left: 10px;
+}
+
+.btn-logout:hover {
+    background: #c0392b;
+}
+
+.admin-nav {
+    margin: 20px 0;
+    display: flex;
+    gap: 10px;
+}
+
+.admin-nav-btn {
+    padding: 10px 20px;
+    background: #0095f6;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+}
+
+.admin-nav-btn.active {
+    background: #007acc;
+}
+
+.admin-nav-btn:hover {
+    background: #007acc;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.admin-table th, .admin-table td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.admin-table th {
+    background: #f5f5f5;
+    font-weight: bold;
+}
+
+.status-admin { color: #d63031; font-weight: bold; }
+.status-public { color: #00b894; font-weight: bold; }
+.status-private { color: #fdcb6e; font-weight: bold; }
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.btn-reset, .btn-toggle, .btn-delete, .btn-chats {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 3px;
+    text-decoration: none;
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-block;
+    text-align: center;
+}
+
+.btn-reset { background: #74b9ff; color: white; }
+.btn-toggle { background: #a29bfe; color: white; }
+.btn-delete { background: #ff7675; color: white; }
+.btn-chats { background: #55efc4; color: white; }
+
+.no-actions {
+    color: #999;
+    font-style: italic;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 5px;
+    width: 400px;
+    max-width: 90%;
+    position: relative;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    position: absolute;
+    right: 15px;
+    top: 10px;
+}
+
+.close:hover {
+    color: black;
+}
+
+.btn-confirm, .btn-cancel {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    margin: 5px;
+    font-size: 14px;
+}
+
+.btn-confirm { background: #00b894; color: white; }
+.btn-cancel { background: #dfe6e9; color: #2d3436; }
+</style>
+{% endblock %}

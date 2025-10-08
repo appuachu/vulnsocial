@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="comments-container">
+    <div class="comments-header">
+        <a href="{{ url_for('profile') }}" class="back-btn">‹</a>
+        <h3>Comments</h3>
+    </div>
+
+    <div class="post-preview">
+        <div class="post-user">
+            <img src="{{ url_for('static', filename='uploads/' + post.user.profile_pic) }}"
+                 alt="{{ post.user.username }}"
+                 onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+            <div>
+                <strong>{{ post.user.username }}</strong>
+                <p>{{ post.caption }}</p>
+            </div>
+        </div>
+        <img src="{{ url_for('static', filename='uploads/' + post.image_path) }}"
+             alt="Post"
+             onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+    </div>
+
+    <div class="comments-list">
+        {% if post.comments %}
+            {% for comment in post.comments %}
+            <div class="comment-item">
+                <img src="{{ url_for('static', filename='uploads/' + comment.user.profile_pic) }}"
+                     alt="{{ comment.user.username }}"
+                     onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                <div class="comment-content">
+                    <strong>{{ comment.user.username }}</strong>
+                    <span>{{ comment.text }}</span>
+                    <div class="comment-time">{{ comment.created_at.strftime('%b %d, %Y') }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-comments">
+                <p>No comments yet</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <form class="add-comment-form" action="{{ url_for('add_comment', post_id=post.id) }}" method="POST">
+        <input type="text" name="text" placeholder="Add a comment..." required>
+        <input type="hidden" name="profile_user_id" value="{{ post.user.id }}">
+        <button type="submit">Post</button>
+    </form>
+</div>
+
+<style>
+.comments-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+}
+
+.comments-header {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #dbdbdb;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.back-btn {
+    font-size: 24px;
+    color: #262626;
+    text-decoration: none;
+    margin-right: 16px;
+}
+
+.comments-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.post-preview {
+    padding: 16px;
+    border-bottom: 1px solid #dbdbdb;
+}
+
+.post-user {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.post-user img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.post-user strong {
+    display: block;
+    font-size: 14px;
+}
+
+.post-user p {
+    margin: 4px 0 0 0;
+    font-size: 14px;
+    color: #262626;
+}
+
+.post-preview img {
+    width: 100%;
+    border-radius: 8px;
+}
+
+.comments-list {
+    padding: 16px;
+    flex: 1;
+}
+
+.comment-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.comment-item img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.comment-content {
+    flex: 1;
+}
+
+.comment-content strong {
+    font-size: 14px;
+    margin-right: 8px;
+}
+
+.comment-content span {
+    font-size: 14px;
+    color: #262626;
+}
+
+.comment-time {
+    font-size: 12px;
+    color: #8e8e8e;
+    margin-top: 4px;
+}
+
+.no-comments {
+    text-align: center;
+    padding: 40px;
+    color: #8e8e8e;
+}
+
+.add-comment-form {
+    display: flex;
+    padding: 16px;
+    border-top: 1px solid #dbdbdb;
+    position: sticky;
+    bottom: 0;
+    background: white;
+}
+
+.add-comment-form input {
+    flex: 1;
+    border: 1px solid #dbdbdb;
+    border-radius: 20px;
+    padding: 12px 16px;
+    outline: none;
+}
+
+.add-comment-form button {
+    background: #0095f6;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    padding: 12px 20px;
+    margin-left: 8px;
+    cursor: pointer;
+    font-weight: 600;
+}
+</style>
+{% endblock %}

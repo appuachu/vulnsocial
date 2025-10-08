@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VulnSocial</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <h2>VulnSocial</h2>
+        </div>
+        <div class="nav-search">
+            {% if session.user_id %}
+            <form action="{{ url_for('search') }}" method="get">
+                <input type="text" name="q" placeholder="Search users..." value="{{ request.args.get('q', '') }}">
+            </form>
+            {% endif %}
+        </div>
+        <div class="nav-links">
+            {% if session.user_id %}
+                {% if current_user and current_user.is_admin %}
+                    <a href="{{ url_for('admin') }}">Admin Panel</a>
+                {% endif %}
+                <a href="{{ url_for('index') }}">Home</a>
+                <a href="{{ url_for('chat') }}" class="nav-link-with-badge">
+                    Chat
+                    {% if unread_messages_count > 0 %}
+                        <span class="nav-badge">{{ unread_messages_count }}</span>
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('manage_requests') }}" class="nav-link-with-badge">
+                    Requests
+                    {% if pending_requests_count > 0 %}
+                        <span class="nav-badge">{{ pending_requests_count }}</span>
+                    {% endif %}
+                </a>
+                <a href="{{ url_for('profile') }}">Profile</a>
+                <a href="{{ url_for('settings') }}">Settings</a>
+                {% if current_user and current_user.is_admin %}
+                    <a href="{{ url_for('admin_logout') }}">Admin Logout</a>
+                {% else %}
+                    <a href="{{ url_for('logout') }}">Logout</a>
+                {% endif %}
+            {% else %}
+                <a href="{{ url_for('login') }}">Login</a>
+                <a href="{{ url_for('register') }}">Register</a>
+
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash-message">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
