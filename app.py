@@ -176,7 +176,6 @@ def view_comments(post_id):
         return redirect(url_for('index'))
 
     return render_template('comments.html', post=post, user=User.query.get(session['user_id']))
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -185,8 +184,8 @@ def register():
         mobile = request.form['mobile']
         password = request.form['password']
 
-        # VULNERABILITY: Weak password hashing (should use stronger hashing)
-        hashed_password = generate_password_hash(password, method='sha256')
+        # FIX: Use default method or specify pbkdf2:sha256
+        hashed_password = generate_password_hash(password)  # Remove method parameter
 
         user = User(username=username, email=email, mobile=mobile, password=hashed_password)
         db.session.add(user)
@@ -640,7 +639,8 @@ def settings():
             new_password = request.form['new_password']
 
             if check_password_hash(user.password, current_password):
-                user.password = generate_password_hash(new_password, method='sha256')
+                # FIX: Use default method
+                user.password = generate_password_hash(new_password)  # Remove method parameter
                 db.session.commit()
                 flash('Password changed successfully')
             else:
@@ -648,7 +648,6 @@ def settings():
 
         # Update privacy settings
         user.is_private = 'is_private' in request.form
-
         db.session.commit()
 
     # VULNERABILITY: Exposing profile views without proper filtering
@@ -787,11 +786,12 @@ def admin():
         if username == 'admin' and password == 'password123':
             admin_user = User.query.filter_by(username='admin').first()
             if not admin_user:
+                # FIX: Use default method
                 admin_user = User(
                     username='admin',
                     email='admin@admin.com',
                     mobile='0000000000',
-                    password=generate_password_hash('password123', method='sha256'),
+                    password=generate_password_hash('password123'),  # Remove method parameter
                     is_admin=True
                 )
                 db.session.add(admin_user)
@@ -837,7 +837,8 @@ def admin_reset_password(user_id):
             user_to_reset = User.query.get(user_id)
             if user_to_reset:
                 new_password = request.form['new_password']
-                user_to_reset.password = generate_password_hash(new_password, method='sha256')
+                # FIX: Use default method
+                user_to_reset.password = generate_password_hash(new_password)  # Remove method parameter
                 db.session.commit()
                 flash(f'Password reset for {user_to_reset.username}')
     return redirect(url_for('admin'))
@@ -913,4 +914,4 @@ def admin_toggle_user_status(user_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True, host='0.0.0.0', port=5010)
+    app.run(debug=True, host='0.0.0.0', port=5000)
