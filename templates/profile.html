@@ -14,7 +14,19 @@
                 {% if user.is_private %}
                     <span class="private-badge">Private</span>
                 {% endif %}
-                <button class="btn-edit-profile" onclick="openEditModal()">Edit Profile</button>
+                {% if is_own_profile %}
+                    <button class="btn-edit-profile" onclick="openEditModal()">Edit Profile</button>
+                {% else %}
+                    <div class="follow-buttons">
+                        {% if is_following %}
+                            <a href="{{ url_for('unfollow_user', user_id=user.id) }}" class="btn-unfollow">Unfollow</a>
+                        {% elif is_pending %}
+                            <span class="btn-pending">Request Pending</span>
+                        {% else %}
+                            <a href="{{ url_for('follow', user_id=user.id) }}" class="btn-follow">Follow</a>
+                        {% endif %}
+                    </div>
+                {% endif %}
             </div>
 
             <div class="profile-stats">
@@ -27,7 +39,7 @@
                     <span>following</span>
                 </div>
                 <div class="stat">
-                    <strong>{{ user.posts|length }}</strong>
+                    <strong>{{ posts_with_counts|length }}</strong>
                     <span>posts</span>
                 </div>
             </div>
@@ -39,6 +51,7 @@
     </div>
 
     <!-- Edit Profile Modal -->
+    {% if is_own_profile %}
     <div id="editProfileModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -46,6 +59,8 @@
                 <span class="close" onclick="closeEditModal()">&times;</span>
             </div>
             <form action="{{ url_for('update_profile') }}" method="POST" enctype="multipart/form-data" class="edit-form">
+                <input type="hidden" name="user_id" value="{{ request.args.get('user_id', '') }}">
+
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="bio">Bio:</label>
@@ -65,45 +80,77 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
-    <!-- Rest of your profile posts section remains the same -->
+    <!-- Posts Section -->
     <div class="profile-posts-section">
-        <h3>Your Posts ({{ user.posts|length }})</h3>
-        {% if posts_with_counts %}
-        <div class="posts-grid">
-            {% for post_data in posts_with_counts %}
-            <div class="post-thumbnail">
-                <img src="{{ url_for('static', filename='uploads/' + post_data.post.image_path) }}"
-                     alt="Post"
-                     onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+        <h3>
+            {% if is_own_profile %}
+                Your Posts ({{ posts_with_counts|length }})
+            {% else %}
+                {{ user.username }}'s Posts ({{ posts_with_counts|length }})
+            {% endif %}
+        </h3>
 
-                <!-- FIXED: Make overlay clickable for comments -->
-                <a href="{{ url_for('view_comments', post_id=post_data.post.id) }}" class="post-overlay-link">
-                    <div class="post-overlay">
-                        <span class="post-likes">❤️ {{ post_data.like_count }}</span>
-                        <span class="post-comments">💬 {{ post_data.comment_count }}</span>
+        {% if can_view %}
+            {% if posts_with_counts %}
+            <div class="posts-grid">
+                {% for post_data in posts_with_counts %}
+                <div class="post-thumbnail">
+                    <img src="{{ url_for('static', filename='uploads/' + post_data.post.image_path) }}"
+                         alt="Post"
+                         onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+
+                    <!-- FIXED: Use post_uid instead of post_id -->
+                    <a href="{{ url_for('view_comments', post_uid=post_data.post.post_uid) }}" class="post-overlay-link">
+                        <div class="post-overlay">
+                            <span class="post-likes">❤️ {{ post_data.like_count }}</span>
+                            <span class="post-comments">💬 {{ post_data.comment_count }}</span>
+                        </div>
+                    </a>
+
+                    <div class="post-management">
+                        <!-- FIXED: Use post_uid instead of post_id -->
+                        <button onclick="togglePost('{{ post_data.post.post_uid }}')" class="btn-toggle">
+                            {% if post_data.post.is_active %}Disable{% else %}Enable{% endif %}
+                        </button>
+                        <!-- FIXED: Use post_uid instead of post_id -->
+                        <a href="{{ url_for('delete_post', post_uid=post_data.post.post_uid) }}"
+                           class="btn-delete"
+                           onclick="return confirm('Delete this post permanently?')">Delete</a>
                     </div>
-                </a>
-
-                <div class="post-management">
-                    <button onclick="togglePost({{ post_data.post.id }})" class="btn-toggle">
-                        {% if post_data.post.is_active %}Disable{% else %}Enable{% endif %}
-                    </button>
-                    <a href="{{ url_for('delete_post', post_id=post_data.post.id) }}"
-                       class="btn-delete"
-                       onclick="return confirm('Delete this post permanently?')">Delete</a>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
+            {% else %}
+            <div class="no-posts">
+                <p>
+                    {% if is_own_profile %}
+                        You haven't posted anything yet.
+                    {% else %}
+                        {{ user.username }} hasn't posted anything yet.
+                    {% endif %}
+                </p>
+                {% if is_own_profile %}
+                    <a href="{{ url_for('index') }}" class="btn-create-post">Create your first post</a>
+                {% endif %}
+            </div>
+            {% endif %}
         {% else %}
-        <div class="no-posts">
-            <p>You haven't posted anything yet.</p>
-            <a href="{{ url_for('index') }}" class="btn-create-post">Create your first post</a>
-        </div>
+            <div class="private-account">
+                <div class="private-icon">🔒</div>
+                <h4>This account is private</h4>
+                <p>Follow {{ user.username }} to see their posts</p>
+                {% if not is_pending and not is_following %}
+                    <a href="{{ url_for('follow', user_id=user.id) }}" class="btn-follow-private">Follow</a>
+                {% elif is_pending %}
+                    <span class="btn-pending-private">Request Pending</span>
+                {% endif %}
+            </div>
         {% endif %}
     </div>
 </div>
+
 
 <style>
 .profile-container {
@@ -154,6 +201,47 @@
     font-weight: bold;
 }
 
+/* Follow Buttons */
+.follow-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-follow, .btn-unfollow, .btn-pending {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-follow {
+    background: #0095f6;
+    color: white;
+}
+
+.btn-follow:hover {
+    background: #007acc;
+}
+
+.btn-unfollow {
+    background: #f8f9fa;
+    color: #262626;
+    border: 1px solid #dbdbdb;
+}
+
+.btn-unfollow:hover {
+    background: #e9ecef;
+}
+
+.btn-pending {
+    background: #fdcb6e;
+    color: #2d3436;
+    cursor: default;
+}
+
 /* Edit Profile Button */
 .btn-edit-profile {
     background: transparent;
@@ -168,6 +256,56 @@
 
 .btn-edit-profile:hover {
     background: #fafafa;
+}
+
+/* IDOR Testing Section */
+.idor-testing {
+    margin-top: 15px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #dc3545;
+}
+
+.idor-testing a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.idor-testing a:hover {
+    text-decoration: underline;
+}
+
+.idor-note {
+    padding: 10px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 5px;
+    margin-top: 15px;
+}
+
+/* Encoding Helper */
+.encoding-helper {
+    margin-top: 20px;
+    padding: 15px;
+    background: #e9ecef;
+    border-radius: 8px;
+}
+
+.encoding-helper details {
+    cursor: pointer;
+}
+
+.encoding-helper summary {
+    font-weight: bold;
+    color: #495057;
+}
+
+.helper-content {
+    margin-top: 10px;
+    padding: 10px;
+    background: white;
+    border-radius: 5px;
 }
 
 /* FIXED: Clickable stats */
@@ -196,6 +334,51 @@
 .stat span {
     font-size: 14px;
     color: #8e8e8e;
+}
+
+/* Private Account Styling */
+.private-account {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border: 1px solid #dbdbdb;
+    border-radius: 10px;
+}
+
+.private-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+}
+
+.private-account h4 {
+    margin: 0 0 10px 0;
+    color: #262626;
+}
+
+.private-account p {
+    color: #8e8e8e;
+    margin-bottom: 20px;
+}
+
+.btn-follow-private {
+    background: #0095f6;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.btn-follow-private:hover {
+    background: #007acc;
+}
+
+.btn-pending-private {
+    background: #fdcb6e;
+    color: #2d3436;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: 600;
 }
 
 /* Modal Styles */
@@ -455,30 +638,31 @@
 </style>
 
 <script>
-function openEditModal() {
-    document.getElementById('editProfileModal').style.display = 'block';
-}
+  function openEditModal() {
+      document.getElementById('editProfileModal').style.display = 'block';
+  }
 
-function closeEditModal() {
-    document.getElementById('editProfileModal').style.display = 'none';
-}
+  function closeEditModal() {
+      document.getElementById('editProfileModal').style.display = 'none';
+  }
 
-// Close modal when clicking outside
-window.addEventListener('click', function(e) {
-    const modal = document.getElementById('editProfileModal');
-    if (e.target === modal) {
-        closeEditModal();
-    }
-});
+  // Close modal when clicking outside
+  window.addEventListener('click', function(e) {
+      const modal = document.getElementById('editProfileModal');
+      if (e.target === modal) {
+          closeEditModal();
+      }
+  });
 
-function togglePost(postId) {
-    fetch(`/toggle_post/${postId}`, { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            alert(data.message);
-            location.reload();
-        })
-        .catch(() => alert('Error toggling post status.'));
-}
-</script>
-{% endblock %}
+  // FIXED: Use post_uid parameter
+  function togglePost(postUid) {
+      fetch(`/toggle_post/${postUid}`, { method: 'POST' })
+          .then(response => response.json())
+          .then(data => {
+              alert(data.message);
+              location.reload();
+          })
+          .catch(() => alert('Error toggling post status.'));
+  }
+  </script>
+  {% endblock %}

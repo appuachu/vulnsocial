@@ -19,7 +19,7 @@
         <div class="users-list">
             {% for user_data in users_with_follow_status %}
             <div class="user-item">
-                <div class="user-info" onclick="location.href='{{ url_for('user_profile', user_id=user_data.user.id) }}'">
+                <div class="user-info" onclick="location.href='{{ url_for('profile') }}?user_id={{ user_data.encoded_id }}'">
                     <img src="{{ url_for('static', filename='uploads/' + user_data.user.profile_pic) }}"
                          alt="{{ user_data.user.username }}"
                          class="user-avatar"
@@ -30,6 +30,10 @@
                         {% if user_data.user.is_private %}
                             <span class="private-indicator">Private Account</span>
                         {% endif %}
+                        <!-- Show encoded ID for testing -->
+                        <small class="encoded-id" title="Base64 Encoded User ID">
+                            ID: {{ user_data.encoded_id }}
+                        </small>
                     </div>
                 </div>
 
@@ -50,7 +54,8 @@
                                 </a>
                             {% endif %}
                         {% endif %}
-                        <a href="{{ url_for('chat') }}?user_id={{ user_data.user.id }}" class="btn-message">
+                        <!-- Update chat link to use encoded ID -->
+                        <a href="{{ url_for('chat') }}?user_id={{ user_data.encoded_id }}" class="btn-message">
                             💬 Message
                         </a>
                     {% else %}
@@ -65,6 +70,9 @@
             <p>No users found for "{{ query }}"</p>
         </div>
         {% endif %}
+
+        <!-- IDOR Testing Section -->
+
     </div>
     {% endif %}
 </div>
@@ -155,6 +163,17 @@
     color: #8e8e8e;
 }
 
+.encoded-id {
+    font-family: monospace;
+    font-size: 10px;
+    color: #666;
+    background: #f8f9fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin-top: 2px;
+    display: inline-block;
+}
+
 .private-indicator {
     background: #ffeaa7;
     color: #2d3436;
@@ -163,6 +182,7 @@
     font-size: 11px;
     font-weight: bold;
     margin-top: 4px;
+    display: inline-block;
 }
 
 .user-actions {
@@ -232,6 +252,62 @@
     border-radius: 10px;
 }
 
+/* IDOR Testing Section */
+.idor-testing-section {
+    margin-top: 30px;
+    padding: 15px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+}
+
+.idor-testing-section details {
+    cursor: pointer;
+}
+
+.idor-testing-section summary {
+    font-weight: bold;
+    color: #856404;
+    font-size: 14px;
+}
+
+.idor-content {
+    margin-top: 10px;
+    padding: 10px;
+    background: white;
+    border-radius: 5px;
+}
+
+.quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.quick-links a {
+    background: #dc3545;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.quick-links a:hover {
+    background: #c82333;
+}
+
+.idor-content p {
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+.idor-content small {
+    color: #666;
+}
+
 @media (max-width: 768px) {
     .user-item {
         flex-direction: column;
@@ -245,6 +321,36 @@
         justify-content: center;
         flex-wrap: wrap;
     }
+    .quick-links {
+        flex-direction: column;
+        align-items: center;
+    }
+    .quick-links a {
+        width: 100%;
+        text-align: center;
+    }
 }
 </style>
+
+<script>
+// Add click handler for encoded IDs to show decoding info
+document.addEventListener('DOMContentLoaded', function() {
+    const encodedIds = document.querySelectorAll('.encoded-id');
+    encodedIds.forEach(element => {
+        element.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const encoded = this.textContent.replace('ID: ', '').trim();
+            try {
+                const decoded = atob(encoded);
+                alert(`Base64 Decoding:\nEncoded: ${encoded}\nDecoded: ${decoded}\nUser ID: ${decoded}`);
+            } catch (error) {
+                alert('Error decoding base64');
+            }
+        });
+    });
+
+    // Log common encoded IDs for testing
+
+});
+</script>
 {% endblock %}

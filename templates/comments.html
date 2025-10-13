@@ -3,190 +3,279 @@
 {% block content %}
 <div class="comments-container">
     <div class="comments-header">
-        <a href="{{ url_for('profile') }}" class="back-btn">‹</a>
-        <h3>Comments</h3>
+        <a href="{{ url_for('index') }}" class="back-btn">← Back to Feed</a>
+        <h2>Comments</h2>
     </div>
 
+    <!-- Post Preview -->
     <div class="post-preview">
         <div class="post-user">
             <img src="{{ url_for('static', filename='uploads/' + post.user.profile_pic) }}"
                  alt="{{ post.user.username }}"
+                 class="user-avatar"
                  onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
-            <div>
+            <div class="user-info">
                 <strong>{{ post.user.username }}</strong>
-                <p>{{ post.caption }}</p>
+                <span class="post-time">{{ post.created_at.strftime('%b %d, %Y at %H:%M') }}</span>
             </div>
         </div>
-        <img src="{{ url_for('static', filename='uploads/' + post.image_path) }}"
-             alt="Post"
-             onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+
+        {% if post.caption %}
+        <div class="post-caption">
+            <p>{{ post.caption }}</p>
+        </div>
+        {% endif %}
+
+        <div class="post-image">
+            <img src="{{ url_for('static', filename='uploads/' + post.image_path) }}"
+                 alt="Post image"
+                 onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+        </div>
     </div>
 
+    <!-- Add Comment Form -->
+    <div class="add-comment-section">
+        <form action="{{ url_for('add_comment', post_uid=post.post_uid) }}" method="POST" class="comment-form">
+            <div class="comment-input-group">
+                <img src="{{ url_for('static', filename='uploads/' + user.profile_pic) }}"
+                     alt="{{ user.username }}"
+                     class="user-avatar-small"
+                     onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                <input type="text" name="text" placeholder="Write a comment..." required maxlength="500">
+                <button type="submit">Post</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Comments List -->
     <div class="comments-list">
+        <h3>{{ post.comments|length }} Comments</h3>
+
         {% if post.comments %}
             {% for comment in post.comments %}
             <div class="comment-item">
                 <img src="{{ url_for('static', filename='uploads/' + comment.user.profile_pic) }}"
                      alt="{{ comment.user.username }}"
+                     class="user-avatar-small"
                      onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
                 <div class="comment-content">
-                    <strong>{{ comment.user.username }}</strong>
-                    <span>{{ comment.text }}</span>
-                    <div class="comment-time">{{ comment.created_at.strftime('%b %d, %Y') }}</div>
+                    <div class="comment-header">
+                        <strong>{{ comment.user.username }}</strong>
+                        <span class="comment-time">{{ comment.created_at.strftime('%b %d, %Y at %H:%M') }}</span>
+                    </div>
+                    <p class="comment-text">{{ comment.text }}</p>
                 </div>
             </div>
             {% endfor %}
         {% else %}
             <div class="no-comments">
-                <p>No comments yet</p>
+                <p>No comments yet. Be the first to comment!</p>
             </div>
         {% endif %}
     </div>
-
-    <form class="add-comment-form" action="{{ url_for('add_comment', post_id=post.id) }}" method="POST">
-        <input type="text" name="text" placeholder="Add a comment..." required>
-        <input type="hidden" name="profile_user_id" value="{{ post.user.id }}">
-        <button type="submit">Post</button>
-    </form>
 </div>
 
 <style>
 .comments-container {
     max-width: 600px;
     margin: 0 auto;
+    padding: 20px;
     background: white;
-    min-height: 100vh;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 .comments-header {
     display: flex;
     align-items: center;
-    padding: 16px;
-    border-bottom: 1px solid #dbdbdb;
-    position: sticky;
-    top: 0;
-    background: white;
-    z-index: 10;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
 }
 
 .back-btn {
-    font-size: 24px;
-    color: #262626;
+    color: #0095f6;
     text-decoration: none;
-    margin-right: 16px;
-}
-
-.comments-header h3 {
-    margin: 0;
-    font-size: 16px;
     font-weight: 600;
 }
 
+.back-btn:hover {
+    text-decoration: underline;
+}
+
+.comments-header h2 {
+    margin: 0;
+    color: #333;
+}
+
+/* Post Preview */
 .post-preview {
     padding: 16px;
-    border-bottom: 1px solid #dbdbdb;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background: #fafafa;
 }
 
 .post-user {
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 12px;
 }
 
-.post-user img {
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-avatar-small {
     width: 32px;
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
 }
 
-.post-user strong {
+.user-info strong {
     display: block;
     font-size: 14px;
 }
 
-.post-user p {
-    margin: 4px 0 0 0;
-    font-size: 14px;
-    color: #262626;
+.post-time {
+    font-size: 12px;
+    color: #666;
 }
 
-.post-preview img {
+.post-caption {
+    margin-bottom: 12px;
+    line-height: 1.4;
+    color: #333;
+}
+
+.post-image img {
     width: 100%;
+    max-height: 400px;
+    object-fit: cover;
     border-radius: 8px;
 }
 
-.comments-list {
-    padding: 16px;
+/* Add Comment Section */
+.add-comment-section {
+    padding: 16px 0;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 20px;
+}
+
+.comment-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.comment-input-group input {
     flex: 1;
+    padding: 12px 16px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-size: 14px;
+    outline: none;
+}
+
+.comment-input-group input:focus {
+    border-color: #0095f6;
+}
+
+.comment-input-group button {
+    background: #0095f6;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.comment-input-group button:hover {
+    background: #007acc;
+}
+
+/* Comments List */
+.comments-list h3 {
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 18px;
 }
 
 .comment-item {
     display: flex;
     gap: 12px;
-    margin-bottom: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
 }
 
-.comment-item img {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    object-fit: cover;
+.comment-item:last-child {
+    border-bottom: none;
 }
 
 .comment-content {
     flex: 1;
 }
 
-.comment-content strong {
-    font-size: 14px;
-    margin-right: 8px;
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
 }
 
-.comment-content span {
+.comment-header strong {
     font-size: 14px;
-    color: #262626;
+    color: #333;
 }
 
 .comment-time {
     font-size: 12px;
-    color: #8e8e8e;
-    margin-top: 4px;
+    color: #666;
+}
+
+.comment-text {
+    margin: 0;
+    line-height: 1.4;
+    color: #333;
+    word-wrap: break-word;
 }
 
 .no-comments {
     text-align: center;
-    padding: 40px;
-    color: #8e8e8e;
+    padding: 30px;
+    color: #666;
 }
 
-.add-comment-form {
-    display: flex;
-    padding: 16px;
-    border-top: 1px solid #dbdbdb;
-    position: sticky;
-    bottom: 0;
-    background: white;
-}
+@media (max-width: 768px) {
+    .comments-container {
+        padding: 15px;
+        margin: 10px;
+    }
 
-.add-comment-form input {
-    flex: 1;
-    border: 1px solid #dbdbdb;
-    border-radius: 20px;
-    padding: 12px 16px;
-    outline: none;
-}
+    .comments-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
 
-.add-comment-form button {
-    background: #0095f6;
-    color: white;
-    border: none;
-    border-radius: 20px;
-    padding: 12px 20px;
-    margin-left: 8px;
-    cursor: pointer;
-    font-weight: 600;
+    .comment-input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .comment-input-group button {
+        align-self: flex-end;
+        margin-top: 8px;
+    }
 }
 </style>
 {% endblock %}

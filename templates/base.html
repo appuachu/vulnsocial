@@ -36,7 +36,10 @@
                         <span class="nav-badge">{{ pending_requests_count }}</span>
                     {% endif %}
                 </a>
-                <a href="{{ url_for('profile') }}">Profile</a>
+                <!-- VULNERABILITY: Profile link without user_id - will use current user by default -->
+                <a href="{{ url_for('profile') }}">My Profile</a>
+                <!-- IDOR Test: Direct link to view other profiles -->
+
                 <a href="{{ url_for('settings') }}">Settings</a>
                 {% if current_user and current_user.is_admin %}
                     <a href="{{ url_for('admin_logout') }}">Admin Logout</a>
@@ -46,7 +49,6 @@
             {% else %}
                 <a href="{{ url_for('login') }}">Login</a>
                 <a href="{{ url_for('register') }}">Register</a>
-
             {% endif %}
         </div>
     </nav>
@@ -62,5 +64,54 @@
 
         {% block content %}{% endblock %}
     </div>
+
+    <style>
+    /* Dropdown styles for IDOR testing */
+    .nav-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+
+    .nav-dropbtn {
+        background: none;
+        border: none;
+        color: #333;
+        text-decoration: none;
+        padding: 14px 16px;
+        display: block;
+    }
+
+    .nav-dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: white;
+        min-width: 200px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+        z-index: 1000;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+
+    .nav-dropdown-content a {
+        color: #333;
+        padding: 12px 16px;
+        text-decoration: none;
+        display: block;
+        border-bottom: 1px solid #f1f1f1;
+        font-size: 14px;
+    }
+
+    .nav-dropdown-content a:hover {
+        background-color: #f1f1f1;
+    }
+
+    .nav-dropdown:hover .nav-dropdown-content {
+        display: block;
+    }
+
+    .nav-dropdown:hover .nav-dropbtn {
+        background-color: #f1f1f1;
+    }
+    </style>
 </body>
 </html>

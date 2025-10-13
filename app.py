@@ -1,17 +1,24 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import jwt
+import secrets
+import random   # Add this import
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, make_response
+import string
+import random
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key_here'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['JWT_SECRET_KEY'] = 'your_jwt_secret_key_here'  # Add JWT secret key
 
 db = SQLAlchemy(app)
-
 # Create upload directory if it doesn't exist
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
@@ -28,6 +35,8 @@ class User(db.Model):
     is_private = db.Column(db.Boolean, default=False)
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    reset_otp = db.Column(db.String(6), nullable=True)  # New field for OTP
+    reset_otp_expiry = db.Column(db.DateTime, nullable=True)  # New field for OTP expiry
     followers = db.relationship('Follow',
                                foreign_keys='Follow.following_id',
                                backref='following_user',
@@ -39,11 +48,12 @@ class User(db.Model):
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    post_uid = db.Column(db.String(8), unique=True, nullable=False, default=lambda: generate_alphanumeric_id())  # New field
     image_path = db.Column(db.String(200), nullable=False)
     caption = db.Column(db.String(500))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    is_active = db.Column(db.Boolean, default=True)  # New field to disable posts
+    is_active = db.Column(db.Boolean, default=True)
     user = db.relationship('User', backref=db.backref('posts', lazy=True))
     likes = db.relationship('Like', backref='post', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='post', lazy=True, cascade='all, delete-orphan')
@@ -57,6 +67,7 @@ class Follow(db.Model):
 
 class Like(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    like_uid = db.Column(db.String(8), unique=True, nullable=False, default=lambda: generate_alphanumeric_id())  # New field
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -64,6 +75,7 @@ class Like(db.Model):
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    comment_uid = db.Column(db.String(8), unique=True, nullable=False, default=lambda: generate_alphanumeric_id())  # New field
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
     text = db.Column(db.String(500), nullable=False)
@@ -99,6 +111,23 @@ def inject_user():
                        unread_messages_count=unread_messages_count)
     return dict(current_user=None, pending_requests_count=0, unread_messages_count=0)
 
+
+def encode_user_id(user_id):
+    """Encode user ID to base64 for URLs"""
+    return base64.b64encode(str(user_id).encode()).decode()
+
+def decode_user_id(encoded_id):
+    """Decode base64 user ID from URL"""
+    try:
+        decoded_bytes = base64.b64decode(encoded_id)
+        return int(decoded_bytes.decode('utf-8'))
+    except (ValueError, base64.binascii.Error, UnicodeDecodeError):
+        return None
+
+def generate_alphanumeric_id(length=8):
+    """Generate a random 8-character alphanumeric ID"""
+    characters = string.ascii_letters + string.digits  # A-Z, a-z, 0-9
+    return ''.join(random.choice(characters) for _ in range(length))
 # Routes
 @app.route('/')
 def index():
@@ -120,7 +149,22 @@ def index():
         ((Post.user_id.notin_(following_ids)) & (User.is_private == False) & (Post.is_active == True))
     ).join(User).order_by(Post.created_at.desc()).all()
 
-    return render_template('index.html', user=user, posts=feed_posts)
+    # Add like counts and comment counts to each post
+    posts_with_counts = []
+    for post in feed_posts:
+        like_count = Like.query.filter_by(post_id=post.id).count()
+        comment_count = Comment.query.filter_by(post_id=post.id).count()
+
+        posts_with_counts.append({
+            'post': post,
+            'like_count': like_count,
+            'comment_count': comment_count
+        })
+
+    return render_template('index.html',
+                         user=user,
+                         posts_with_counts=posts_with_counts,
+                         session=session)
 
 # @app.route('/create_post', methods=['POST'])
 # def create_post():
@@ -140,7 +184,7 @@ def index():
 #         return jsonify({'success': False, 'error': 'Please upload an image file'})
 #
 #     filename = f"post_{session['user_id']}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{file.filename}"
-#     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+#     file_path = os.path.join(app.config['UPLOAD_FOLDER'], filenfame)
 #
 #     try:
 #         file.save(file_path)
@@ -151,12 +195,23 @@ def index():
 #     except Exception as e:
 #         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/toggle_post/<int:post_id>', methods=['POST'])
-def toggle_post(post_id):
+def get_post_by_uid(post_uid):
+    return Post.query.filter_by(post_uid=post_uid).first()
+
+def get_like_by_uid(like_uid):
+    return Like.query.filter_by(like_uid=like_uid).first()
+
+def get_comment_by_uid(comment_uid):
+    return Comment.query.filter_by(comment_uid=comment_uid).first()
+
+
+
+@app.route('/toggle_post/<string:post_uid>', methods=['POST'])
+def toggle_post(post_uid):
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'Not logged in'})
 
-    post = Post.query.get(post_id)
+    post = get_post_by_uid(post_uid)
     if post and post.user_id == session['user_id']:
         post.is_active = not post.is_active
         db.session.commit()
@@ -165,17 +220,18 @@ def toggle_post(post_id):
 
     return jsonify({'success': False, 'error': 'Post not found'})
 
-@app.route('/view_comments/<int:post_id>')
-def view_comments(post_id):
+@app.route('/view_comments/<string:post_uid>')
+def view_comments(post_uid):
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    post = Post.query.get(post_id)
+    post = get_post_by_uid(post_uid)
     if not post:
         flash('Post not found')
         return redirect(url_for('index'))
 
     return render_template('comments.html', post=post, user=User.query.get(session['user_id']))
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -195,21 +251,84 @@ def register():
 
     return render_template('register.html')
 
+@app.context_processor
+def inject_user():
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        if user:
+            pending_requests_count = Follow.query.filter_by(following_id=user.id, status='pending').count()
+            unread_messages_count = Message.query.filter_by(receiver_id=user.id, is_read=False).count()
+            return dict(current_user=user,
+                       pending_requests_count=pending_requests_count,
+                       unread_messages_count=unread_messages_count)
+    return dict(current_user=None, pending_requests_count=0, unread_messages_count=0)
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
 
+        # VULNERABILITY 1: Classic SQL Injection - String concatenation
+        # This is extremely vulnerable to SQL injection
+        query1 = f"SELECT * FROM user WHERE username = '{username}' AND password = '{password}'"
+
+        # VULNERABILITY 2: OR 1=1 injection
+        # This allows bypassing authentication with ' OR '1'='1
+        query2 = f"SELECT * FROM user WHERE username = '{username}'"
+
+        # VULNERABILITY 3: Comment-based injection
+        # This allows bypassing with: admin' --
+        query3 = f"SELECT * FROM user WHERE username = '{username}' -- AND password = '{password}'"
+
+        # VULNERABILITY 4: Union-based injection
+        query4 = f"SELECT id, username, password FROM user WHERE username = '{username}' UNION SELECT 1, 'admin', 'password' -- "
+
+        try:
+            # VULNERABILITY: Direct SQL execution (most dangerous)
+            # This executes raw SQL without any sanitization
+            from sqlalchemy import text
+            dangerous_query = text(f"SELECT * FROM user WHERE username = '{username}' AND password = '{password}'")
+            result = db.session.execute(dangerous_query).fetchone()
+
+            if result:
+                user_dict = dict(result)
+                session['user_id'] = user_dict['id']
+                return redirect(url_for('index'))
+
+        except Exception as e:
+            print(f"SQL Injection attempt detected: {e}")
+
+        # VULNERABILITY 5: Blind SQL Injection
+        # Check if user exists without proper validation
+        user_exists_query = text(f"SELECT id FROM user WHERE username = '{username}'")
+        user_exists = db.session.execute(user_exists_query).fetchone()
+
+        if user_exists:
+            # VULNERABILITY: Timing attack - check password character by character
+            flash('User exists - try SQL injection payloads!', 'info')
+
+        # VULNERABILITY 6: Second-order SQL Injection
+        # Store malicious input for later execution
+        malicious_input = f"{username}' OR '1'='1"
+        # In a real app, this might be stored and executed later
+
+        # Fallback to normal authentication (but still vulnerable)
         user = User.query.filter_by(username=username).first()
 
-        # VULNERABILITY: SQL Injection vulnerable code (for educational purposes)
-        # In real app, use parameterized queries
+        # VULNERABILITY: SQL Injection in filter condition
+        # This can be exploited with carefully crafted usernames
         if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
             return redirect(url_for('index'))
         else:
-            flash('Invalid credentials')
+            # VULNERABILITY: Error-based SQL Injection information disclosure
+            error_msg = f"Invalid credentials for user: {username}"
+            flash(error_msg)
+
+            # VULNERABILITY: Debug information exposure
+            if 'debug' in request.args:
+                flash(f"Query used: SELECT * FROM user WHERE username = '{username}'")
 
     return render_template('login.html')
 
@@ -218,12 +337,169 @@ def logout():
     session.pop('user_id', None)
     return redirect(url_for('login'))
 
+# New Forgot Password Routes
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        username = request.form.get('username')
+
+        user = User.query.filter_by(username=username).first()
+        if user:
+            # Generate OTP
+            otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+
+            user.reset_otp = otp
+            user.reset_otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+            db.session.commit()
+
+            # Generate JWT token
+            jwt_token = jwt.encode({
+                'user_id': user.id,
+                'otp': otp,
+                'exp': datetime.utcnow() + timedelta(minutes=10)
+            }, app.config['JWT_SECRET_KEY'], algorithm='HS256')
+
+            # Create response and add headers
+            response = make_response(render_template('reset_password.html',
+                                     username=username,
+                                     jwt_token=jwt_token,
+                                     show_otp_field=True))
+
+            # Add OTP and JWT as headers for easy access in Burp
+            response.headers['X-OTP'] = otp
+            response.headers['X-JWT-Token'] = jwt_token
+
+            return response
+        else:
+            flash('Username not found')
+
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password', methods=['POST'])
+def reset_password():
+    jwt_token = request.form.get('jwt_token')
+    otp = request.form.get('otp')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    if new_password != confirm_password:
+        flash('Passwords do not match')
+        return redirect(request.referrer)
+
+    try:
+        # Decode JWT token
+        payload = jwt.decode(jwt_token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        user_id = payload['user_id']
+        expected_otp = payload['otp']
+
+        user = User.query.get(user_id)
+
+        if not user:
+            flash('Invalid token')
+            return redirect(url_for('forgot_password'))
+
+        # Check if OTP matches and is not expired
+        if (user.reset_otp == otp == expected_otp and
+            user.reset_otp_expiry and
+            user.reset_otp_expiry > datetime.utcnow()):
+
+            # Update password
+            user.password = generate_password_hash(new_password)
+            user.reset_otp = None
+            user.reset_otp_expiry = None
+            db.session.commit()
+
+            flash('Password reset successfully! Please login with your new password.')
+            return redirect(url_for('login'))
+        else:
+            flash('Invalid or expired OTP')
+
+    except jwt.ExpiredSignatureError:
+        flash('Token has expired')
+    except jwt.InvalidTokenError:
+        flash('Invalid token')
+
+    # Return to reset page with tokens in headers for Burp
+    response = make_response(redirect(url_for('forgot_password')))
+    response.headers['X-JWT-Token'] = jwt_token
+    if otp:
+        response.headers['X-OTP'] = otp
+    return response
+
+# Bypass OTP route for testing/demo purposes
+@app.route('/bypass_otp', methods=['POST'])
+def bypass_otp():
+    """This route allows bypassing OTP verification for testing purposes"""
+    jwt_token = request.form.get('jwt_token')
+
+    try:
+        # Decode JWT token without verifying OTP
+        payload = jwt.decode(jwt_token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        user_id = payload['user_id']
+
+        user = User.query.get(user_id)
+
+        if not user:
+            return jsonify({'success': False, 'error': 'Invalid token'})
+
+        # Return user info and token for bypass
+        return jsonify({
+            'success': True,
+            'user_id': user.id,
+            'username': user.username,
+            'jwt_token': jwt_token,
+            'message': 'OTP bypassed successfully'
+        })
+
+    except jwt.InvalidTokenError:
+        return jsonify({'success': False, 'error': 'Invalid token'})
+
+# API endpoint to get OTP from JWT token
+@app.route('/api/get_otp_from_token', methods=['POST'])
+def get_otp_from_token():
+    """API endpoint to extract OTP from JWT token"""
+    jwt_token = request.json.get('jwt_token')
+
+    try:
+        payload = jwt.decode(jwt_token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        return jsonify({
+            'success': True,
+            'otp': payload.get('otp'),
+            'user_id': payload.get('user_id'),
+            'expires_at': payload.get('exp')
+        })
+    except jwt.InvalidTokenError as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+import base64
+
 @app.route('/profile')
 def profile():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    user = User.query.get(session['user_id'])
+    # VULNERABILITY: IDOR with base64 encoding - still vulnerable but less obvious
+    encoded_user_id = request.args.get('user_id')
+
+    if encoded_user_id:
+        try:
+            # Decode base64 user_id
+            decoded_bytes = base64.b64decode(encoded_user_id)
+            user_id = int(decoded_bytes.decode('utf-8'))
+        except (ValueError, base64.binascii.Error, UnicodeDecodeError):
+            # If decoding fails, use current user's ID
+            user_id = session['user_id']
+    else:
+        # If no user_id provided, use current user's ID but redirect to include it
+        user_id = session['user_id']
+        # Auto-redirect to include encoded user_id in URL
+        encoded_id = base64.b64encode(str(user_id).encode()).decode()
+        return redirect(url_for('profile', user_id=encoded_id))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash('User not found')
+        return redirect(url_for('index'))
 
     # Calculate stats
     followers_count = Follow.query.filter_by(following_id=user.id, status='accepted').count()
@@ -241,32 +517,67 @@ def profile():
             'comment_count': comment_count
         })
 
+    # Check if it's the current user's own profile
+    is_own_profile = (user.id == session['user_id'])
+
+    # Check follow status for other profiles
+    is_following = False
+    is_pending = False
+    can_view = True
+
+    if not is_own_profile:
+        follow_status = Follow.query.filter_by(
+            follower_id=session['user_id'],
+            following_id=user.id
+        ).first()
+        is_following = follow_status and follow_status.status == 'accepted'
+        is_pending = follow_status and follow_status.status == 'pending'
+
+        # Check if user can view private profile
+        if user.is_private and not is_following and not is_own_profile:
+            can_view = False
+
     return render_template('profile.html',
                          user=user,
                          followers_count=followers_count,
                          following_count=following_count,
-                         posts_with_counts=posts_with_counts)
+                         posts_with_counts=posts_with_counts,
+                         is_own_profile=is_own_profile,
+                         is_following=is_following,
+                         is_pending=is_pending,
+                         can_view=can_view)
 @app.route('/update_profile', methods=['POST'])
 def update_profile():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    user = User.query.get(session['user_id'])
+    # VULNERABILITY: IDOR with base64 encoding
+    encoded_user_id = request.form.get('user_id')
+
+    if encoded_user_id:
+        try:
+            # Decode base64 user_id
+            decoded_bytes = base64.b64decode(encoded_user_id)
+            user_id = int(decoded_bytes.decode('utf-8'))
+        except (ValueError, base64.binascii.Error, UnicodeDecodeError):
+            user_id = session['user_id']
+    else:
+        user_id = session['user_id']
+
+    user = User.query.get(user_id)
+
     if not user:
-        session.pop('user_id', None)
-        return redirect(url_for('login'))
+        flash('User not found')
+        return redirect(url_for('profile'))
 
     user.bio = request.form['bio']
 
-    # Handle profile picture upload
     if 'profile_pic' in request.files:
         file = request.files['profile_pic']
         if file.filename != '':
-            # Ensure upload directory exists
             if not os.path.exists(app.config['UPLOAD_FOLDER']):
                 os.makedirs(app.config['UPLOAD_FOLDER'])
 
-            # Secure filename and save
             filename = f"user_{user.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{file.filename}"
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
@@ -282,7 +593,9 @@ def update_profile():
         flash('Profile information updated!')
 
     db.session.commit()
-    return redirect(url_for('profile'))
+    # Encode user_id for redirect to maintain consistency
+    encoded_id = base64.b64encode(str(user.id).encode()).decode()
+    return redirect(url_for('profile', user_id=encoded_id))
 
 @app.route('/followers/<int:user_id>')
 def followers_list(user_id):
@@ -456,6 +769,7 @@ def create_post():
 
     try:
         file.save(file_path)
+        # Post will automatically get a post_uid from the default function
         post = Post(image_path=filename, caption=caption, user_id=session['user_id'])
         db.session.add(post)
         db.session.commit()
@@ -463,13 +777,13 @@ def create_post():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/delete_post/<int:post_id>')
-def delete_post(post_id):
+@app.route('/delete_post/<string:post_uid>')
+def delete_post(post_uid):
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
     # VULNERABILITY: Insecure Direct Object Reference - No ownership check
-    post = Post.query.get(post_id)
+    post = get_post_by_uid(post_uid)
     if post:
         db.session.delete(post)
         db.session.commit()
@@ -477,40 +791,52 @@ def delete_post(post_id):
 
     return redirect(url_for('index'))
 
-@app.route('/like_post/<int:post_id>')
-def like_post(post_id):
+@app.route('/like_post/<string:post_uid>')
+def like_post(post_uid):
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'})
 
-    existing_like = Like.query.filter_by(user_id=session['user_id'], post_id=post_id).first()
+    post = get_post_by_uid(post_uid)
+    if not post:
+        return jsonify({'error': 'Post not found'})
+
+    existing_like = Like.query.filter_by(user_id=session['user_id'], post_id=post.id).first()
 
     if existing_like:
         db.session.delete(existing_like)
         liked = False
     else:
-        like = Like(user_id=session['user_id'], post_id=post_id)
+        like = Like(user_id=session['user_id'], post_id=post.id)
         db.session.add(like)
         liked = True
 
     db.session.commit()
 
     # Get updated like count
-    like_count = Like.query.filter_by(post_id=post_id).count()
+    like_count = Like.query.filter_by(post_id=post.id).count()
 
     return jsonify({'success': True, 'liked': liked, 'like_count': like_count})
 
-@app.route('/add_comment/<int:post_id>', methods=['POST'])
-def add_comment(post_id):
+@app.route('/add_comment/<string:post_uid>', methods=['POST'])
+def add_comment(post_uid):
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
+    post = get_post_by_uid(post_uid)
+    if not post:
+        flash('Post not found')
+        return redirect(url_for('index'))
+
     text = request.form['text']
-    comment = Comment(user_id=session['user_id'], post_id=post_id, text=text)
-    db.session.add(comment)
-    db.session.commit()
+    if text.strip():
+        comment = Comment(user_id=session['user_id'], post_id=post.id, text=text.strip())
+        db.session.add(comment)
+        db.session.commit()
+        flash('Comment added successfully!')
+    else:
+        flash('Comment cannot be empty')
 
-    return redirect(url_for('index', user_id=request.form.get('profile_user_id')))
-
+    return redirect(url_for('view_comments', post_uid=post_uid))
 @app.route('/search')
 def search():
     if 'user_id' not in session:
@@ -522,7 +848,7 @@ def search():
     # Get current user
     current_user = User.query.get(session['user_id'])
 
-    # Prepare user data with follow status
+    # Prepare user data with follow status and encoded IDs
     users_with_follow_status = []
     for user in users:
         # Check if current user is following this user
@@ -531,8 +857,12 @@ def search():
             following_id=user.id
         ).first()
 
+        # Encode user ID for profile links
+        encoded_id = base64.b64encode(str(user.id).encode()).decode()
+
         users_with_follow_status.append({
             'user': user,
+            'encoded_id': encoded_id,
             'is_following': follow_status is not None,
             'follow_status': follow_status.status if follow_status else None
         })
@@ -630,33 +960,53 @@ def settings():
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    user = User.query.get(session['user_id'])
+    # VULNERABILITY: IDOR with base64 encoding
+    encoded_user_id = request.args.get('user_id')
+
+    if encoded_user_id:
+        try:
+            # Decode base64 user_id
+            decoded_bytes = base64.b64decode(encoded_user_id)
+            user_id = int(decoded_bytes.decode('utf-8'))
+        except (ValueError, base64.binascii.Error, UnicodeDecodeError):
+            # If decoding fails, use current user's ID
+            user_id = session['user_id']
+    else:
+        user_id = session['user_id']
+
+    user = User.query.get(user_id)
 
     if request.method == 'POST':
+        # VULNERABILITY: Also check for encoded user_id in form data
+        form_encoded_user_id = request.form.get('user_id')
+        if form_encoded_user_id:
+            try:
+                decoded_bytes = base64.b64decode(form_encoded_user_id)
+                form_user_id = int(decoded_bytes.decode('utf-8'))
+                # Use the form user_id if provided
+                user = User.query.get(form_user_id)
+            except (ValueError, base64.binascii.Error, UnicodeDecodeError):
+                pass
+
         if 'current_password' in request.form:
-            # Change password
             current_password = request.form['current_password']
             new_password = request.form['new_password']
 
             if check_password_hash(user.password, current_password):
-                # FIX: Use default method
-                user.password = generate_password_hash(new_password)  # Remove method parameter
+                user.password = generate_password_hash(new_password)
                 db.session.commit()
                 flash('Password changed successfully')
             else:
                 flash('Current password is incorrect')
 
-        # Update privacy settings
         user.is_private = 'is_private' in request.form
         db.session.commit()
 
-    # VULNERABILITY: Exposing profile views without proper filtering
     profile_views = ProfileView.query.filter_by(profile_id=user.id).order_by(ProfileView.viewed_at.desc()).all()
     viewers = []
-    for view in profile_views[-4:]:  # Show last 4 views
+    for view in profile_views[-4:]:
         viewer = User.query.get(view.viewer_id)
         if viewer:
-            # Show partial username
             username = viewer.username
             if len(username) > 3:
                 partial_username = username[-3:].rjust(len(username), '*')
@@ -673,11 +1023,16 @@ def chat():
 
     user = User.query.get(session['user_id'])
 
-    # Get specific user if user_id is provided
-    target_user_id = request.args.get('user_id')
+    # Get specific user if user_id is provided (encoded)
+    encoded_target_user_id = request.args.get('user_id')
     target_user = None
-    if target_user_id:
-        target_user = User.query.get(target_user_id)
+    if encoded_target_user_id:
+        try:
+            decoded_bytes = base64.b64decode(encoded_target_user_id)
+            target_user_id = int(decoded_bytes.decode('utf-8'))
+            target_user = User.query.get(target_user_id)
+        except (ValueError, base64.binascii.Error, UnicodeDecodeError):
+            pass
 
     # Get users that current user can chat with (followed and accepted)
     follows = Follow.query.filter(
@@ -692,6 +1047,8 @@ def chat():
         else:
             chat_user = User.query.get(follow.follower_id)
         if chat_user and chat_user not in chat_users:
+            # Encode user ID for profile links
+            chat_user.encoded_id = base64.b64encode(str(chat_user.id).encode()).decode()
             chat_users.append(chat_user)
 
     return render_template('chat.html',
@@ -910,6 +1267,8 @@ def admin_toggle_user_status(user_id):
                 status = "private" if user.is_private else "public"
                 flash(f'{user.username} account set to {status}')
     return redirect(url_for('admin'))
+
+
 
 if __name__ == '__main__':
     with app.app_context():

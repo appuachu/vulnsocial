@@ -1,637 +1,718 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="instagram-container">
-    <!-- Stories Section -->
-    <div class="stories-section">
-        <div class="stories-container">
-            <!-- Add story button -->
-            <div class="story-item">
-                <div class="story-avatar your-story">
-                    <img src="{{ url_for('static', filename='uploads/' + user.profile_pic) }}"
-                         alt="Your story"
-                         onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
-                    <div class="add-story">+</div>
-                </div>
-                <span>Your story</span>
-            </div>
+<div class="container">
+    <div class="feed-container">
+        <!-- Floating Create Post Button -->
+        <button class="floating-post-btn" onclick="openCreatePostModal()">
+            +
+        </button>
 
-            <!-- Other stories would go here -->
-        </div>
-    </div>
-
-    <!-- Create Post Modal -->
-    <div id="createPostModal" class="modal">
-        <div class="modal-content instagram-modal">
-            <div class="modal-header">
-                <h3>Create new post</h3>
-                <span class="close">&times;</span>
-            </div>
-            <form id="createPostForm" enctype="multipart/form-data">
-                <div class="modal-body">
-                    <div class="upload-section">
-                        <div class="upload-icon">📷</div>
-                        <h4>Upload photos and videos here</h4>
-                        <input type="file" id="postImage" name="image" accept="image/*" required hidden>
-                        <button type="button" class="btn-select" onclick="document.getElementById('postImage').click()">
-                            Select from computer
-                        </button>
-                    </div>
-                    <div class="preview-section" id="previewSection" style="display: none;">
-                        <img id="imagePreview" src="" alt="Preview">
-                        <div class="caption-section">
-                            <textarea name="caption" placeholder="Write a caption..." maxlength="500"></textarea>
-                            <div class="char-count">0/500</div>
+        <!-- Feed Posts -->
+        <div class="feed-posts">
+            {% if posts_with_counts %}
+                {% for post_data in posts_with_counts %}
+                <div class="post-card" id="post-{{ post_data.post.post_uid }}">
+                    <!-- Post Header -->
+                    <div class="post-header">
+                        <div class="post-user">
+                            <img src="{{ url_for('static', filename='uploads/' + post_data.post.user.profile_pic) }}"
+                                 alt="{{ post_data.post.user.username }}"
+                                 class="user-avatar"
+                                 onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
+                            <div class="user-info">
+                                <strong>{{ post_data.post.user.username }}</strong>
+                                <span class="post-time">{{ post_data.post.created_at.strftime('%b %d, %Y at %H:%M') }}</span>
+                            </div>
                         </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn-cancel">Cancel</button>
-                    <button type="submit" class="btn-share" disabled>Share</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
-    <!-- Posts Feed -->
-    <div class="posts-feed">
-        {% if posts %}
-            {% for post in posts %}
-            <div class="post-card">
-                <!-- Post Header -->
-                <div class="post-header">
-                    <div class="post-user">
-                        <img src="{{ url_for('static', filename='uploads/' + post.user.profile_pic) }}"
-                             alt="{{ post.user.username }}"
-                             onerror="this.src='{{ url_for('static', filename='images/default.jpg') }}'">
-                        <span class="username">{{ post.user.username }}</span>
-                        {% if not post.is_active %}
-                            <span class="post-disabled-badge">Disabled</span>
+                        {% if post_data.post.user_id == session.user_id %}
+                        <div class="post-options">
+                            <button onclick="togglePost('{{ post_data.post.post_uid }}')" class="btn-toggle">
+                                {% if post_data.post.is_active %}🔴{% else %}🟢{% endif %}
+                            </button>
+                            <a href="{{ url_for('delete_post', post_uid=post_data.post.post_uid) }}"
+                               class="btn-delete"
+                               onclick="return confirm('Delete this post permanently?')">
+                                🗑️
+                            </a>
+                        </div>
                         {% endif %}
                     </div>
-                    <div class="post-options">
-                        <span class="options-dots">⋯</span>
+
+                    <!-- Post Caption -->
+                    {% if post_data.post.caption %}
+                    <div class="post-caption">
+                        <p>{{ post_data.post.caption }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Post Image -->
+                    <div class="post-image">
+                        <img src="{{ url_for('static', filename='uploads/' + post_data.post.image_path) }}"
+                             alt="Post image"
+                             onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+                    </div>
+
+                    <!-- Post Stats -->
+                    <div class="post-stats">
+                        <span class="likes-count">{{ post_data.like_count }} likes</span>
+                        <span class="comments-count">{{ post_data.comment_count }} comments</span>
+                    </div>
+
+                    <!-- Post Actions -->
+                    <div class="post-actions">
+                        <button onclick="likePost('{{ post_data.post.post_uid }}')"
+                                class="action-btn like-btn"
+                                id="like-btn-{{ post_data.post.post_uid }}">
+                            ❤️ Like
+                        </button>
+                        <a href="{{ url_for('view_comments', post_uid=post_data.post.post_uid) }}" class="action-btn comment-btn">
+                            💬 Comment
+                        </a>
+                    
+                    </div>
+
+                    <!-- Quick Comment -->
+                    <div class="quick-comment">
+                        <form action="{{ url_for('add_comment', post_uid=post_data.post.post_uid) }}" method="POST" class="comment-form">
+                            <input type="text" name="text" placeholder="Write a comment..." required>
+                            <button type="submit">Post</button>
+                        </form>
                     </div>
                 </div>
-
-                <!-- Post Image -->
-                <div class="post-image">
-                    <img src="{{ url_for('static', filename='uploads/' + post.image_path) }}"
-                         alt="Post"
-                         onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
-                </div>
-
-                <!-- Post Actions -->
-                <div class="post-actions">
-                    <div class="action-buttons">
-                        <button class="action-btn like-btn" data-post-id="{{ post.id }}">
-                            <span class="like-icon">❤️</span>
-                        </button>
-                        <button class="action-btn comment-btn" onclick="location.href='{{ url_for('view_comments', post_id=post.id) }}'">
-                            <span class="comment-icon">💬</span>
-                        </button>
-                        <button class="action-btn share-btn">
-                            <span class="share-icon">📤</span>
-                        </button>
-                    </div>
-                    <button class="action-btn save-btn">
-                        <span class="save-icon">🔖</span>
-                    </button>
-                </div>
-
-                <!-- Post Stats -->
-                <div class="post-stats">
-                    <span class="likes-count">{{ post.likes|length }} likes</span>
-                    <span class="post-time">{{ post.created_at.strftime('%B %d, %Y') }}</span>
-                </div>
-
-                <!-- Post Caption -->
-                <div class="post-caption">
-                    <strong>{{ post.user.username }}</strong> {{ post.caption }}
-                </div>
-
-                <!-- View Comments -->
-                <div class="view-comments">
-                    <a href="{{ url_for('view_comments', post_id=post.id) }}" class="view-comments-link">
-                        View all {{ post.comments|length }} comments
-                    </a>
-                </div>
-
-                <!-- Add Comment -->
-                <form class="add-comment-form" data-post-id="{{ post.id }}">
-                    <input type="text" placeholder="Add a comment..." class="comment-input">
-                    <button type="submit" class="comment-post-btn" disabled>Post</button>
-                </form>
-            </div>
-            {% endfor %}
-        {% else %}
-            <div class="no-posts">
-                <div class="no-posts-content">
+                {% endfor %}
+            {% else %}
+                <div class="no-posts">
                     <h3>No posts yet</h3>
-                    <p>When people you follow post, you'll see their photos and videos here.</p>
-                    <button class="btn-find-people" onclick="location.href='{{ url_for('search') }}'">
-                        Find people to follow
-                    </button>
+                    <p>Create your first post by clicking the + button!</p>
                 </div>
-            </div>
-        {% endif %}
+            {% endif %}
+        </div>
     </div>
 </div>
 
-<!-- Floating Action Button for Create Post -->
-<button class="fab" onclick="openCreatePostModal()">
-    <span>+</span>
-</button>
+<!-- Create Post Modal -->
+<div id="createPostModal" class="modal">
+    <div class="modal-content create-post-modal">
+        <div class="modal-header">
+            <h3>Create New Post</h3>
+            <span class="close" onclick="closeCreatePostModal()">&times;</span>
+        </div>
+        <form id="createPostForm" enctype="multipart/form-data" class="create-post-form">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="postImage" class="file-upload-area" id="fileUploadArea">
+                        <div class="upload-placeholder">
+                            <span class="upload-icon">📷</span>
+                            <p>Click to select a photo</p>
+                            <small>Supported formats: JPG, PNG, GIF</small>
+                        </div>
+                        <input type="file" id="postImage" accept="image/*" style="display: none;">
+                    </label>
+                    <div id="imagePreview" class="image-preview"></div>
+                </div>
 
-<script>
-
-  // Like functionality
-document.querySelectorAll('.like-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const postId = this.dataset.postId;
-
-        fetch(`/like_post/${postId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    this.classList.toggle('liked', data.liked);
-
-                    // Update like count display
-                    const likesElement = this.closest('.post-card').querySelector('.likes-count');
-                    if (likesElement) {
-                        likesElement.textContent = `${data.like_count} likes`;
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error liking post:', error);
-            });
-    });
-});
-function openCreatePostModal() {
-    document.getElementById('createPostModal').style.display = 'block';
-}
-
-function closeCreatePostModal() {
-    document.getElementById('createPostModal').style.display = 'none';
-    document.getElementById('previewSection').style.display = 'none';
-    document.getElementById('createPostForm').reset();
-}
-
-// Image preview
-document.getElementById('postImage').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            document.getElementById('imagePreview').src = e.target.result;
-            document.getElementById('previewSection').style.display = 'block';
-            document.querySelector('.upload-section').style.display = 'none';
-            document.querySelector('.btn-share').disabled = false;
-        }
-        reader.readAsDataURL(file);
-    }
-});
-
-// Character count for caption
-document.querySelector('textarea[name="caption"]').addEventListener('input', function(e) {
-    const count = e.target.value.length;
-    document.querySelector('.char-count').textContent = `${count}/500`;
-});
-
-// Form submission
-document.getElementById('createPostForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-
-    const formData = new FormData(this);
-
-    fetch('/create_post', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            closeCreatePostModal();
-            location.reload();
-        } else {
-            alert('Error: ' + data.error);
-        }
-    });
-});
-
-// Close modal when clicking X or outside
-document.querySelector('.close').addEventListener('click', closeCreatePostModal);
-document.querySelector('.btn-cancel').addEventListener('click', closeCreatePostModal);
-window.addEventListener('click', function(e) {
-    if (e.target === document.getElementById('createPostModal')) {
-        closeCreatePostModal();
-    }
-});
-
-// Like functionality
-document.querySelectorAll('.like-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        const postId = this.dataset.postId;
-        // Add like functionality here
-        this.classList.toggle('liked');
-    });
-});
-</script>
+                <div class="form-group">
+                    <label for="postCaption">Caption (optional)</label>
+                    <textarea id="postCaption" placeholder="Write a caption..." maxlength="500" rows="4"></textarea>
+                    <div class="char-count">
+                        <span id="charCount">0</span>/500
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-cancel" onclick="closeCreatePostModal()">Cancel</button>
+                <button type="submit" class="btn-post" id="postSubmitBtn" disabled>Post</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <style>
-.instagram-container {
+.container {
     max-width: 600px;
     margin: 0 auto;
-    padding: 20px 0;
+    padding: 20px;
 }
 
-/* Stories Section */
-.stories-section {
+.feed-container {
     background: white;
-    border: 1px solid #dbdbdb;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 24px;
-    overflow-x: auto;
-}
-
-.stories-container {
-    display: flex;
-    gap: 16px;
-}
-
-.story-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-}
-
-.story-avatar {
-    width: 66px;
-    height: 66px;
-    border-radius: 50%;
-    background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
-    padding: 2px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     position: relative;
 }
 
-.story-avatar img {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    border: 2px solid white;
-    object-fit: cover;
-}
-
-.your-story .story-avatar {
-    background: #dbdbdb;
-}
-
-.add-story {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    background: #0095f6;
+/* Floating Post Button */
+.floating-post-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #0095f6, #007acc);
     color: white;
-    width: 20px;
-    height: 20px;
+    border: none;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    border: 2px solid white;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0, 149, 246, 0.4);
+    z-index: 1000;
+    transition: all 0.3s ease;
 }
 
-.story-item span {
-    font-size: 12px;
-    color: #262626;
+.floating-post-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 25px rgba(0, 149, 246, 0.6);
 }
 
-/* Posts Feed */
-.posts-feed {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
-
+/* Post Card Styles */
 .post-card {
-    background: white;
-    border: 1px solid #dbdbdb;
-    border-radius: 8px;
+    border-bottom: 1px solid #eee;
+    padding: 16px;
 }
 
 .post-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 16px;
+    margin-bottom: 12px;
 }
 
 .post-user {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 }
 
-.post-user img {
-    width: 32px;
-    height: 32px;
+.user-avatar {
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     object-fit: cover;
 }
 
-.username {
-    font-weight: 600;
-    color: #262626;
-}
-
-.post-disabled-badge {
-    background: #ff7675;
-    color: white;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: bold;
-}
-
-.options-dots {
-    font-size: 20px;
-    color: #262626;
-    cursor: pointer;
-}
-
-.post-image img {
-    width: 100%;
-    height: auto;
+.user-info strong {
     display: block;
-}
-
-.post-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 16px;
-}
-
-.action-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 24px;
-    padding: 0;
-}
-
-.like-btn.liked .like-icon {
-    color: #ed4956;
-}
-
-.post-stats {
-    padding: 0 16px 8px;
-}
-
-.likes-count {
-    font-weight: 600;
-    color: #262626;
     font-size: 14px;
 }
 
 .post-time {
-    color: #8e8e8e;
-    font-size: 10px;
-    text-transform: uppercase;
-    margin-left: 8px;
+    font-size: 12px;
+    color: #666;
+}
+
+.post-options {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-toggle, .btn-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+}
+
+.btn-delete {
+    color: #dc3545;
 }
 
 .post-caption {
-    padding: 0 16px 8px;
-    font-size: 14px;
+    margin-bottom: 12px;
     line-height: 1.4;
 }
 
-.view-comments {
-    padding: 0 16px 8px;
+.post-image {
+    margin-bottom: 12px;
 }
 
-.view-comments-link {
-    color: #8e8e8e;
-    font-size: 14px;
-    text-decoration: none;
+.post-image img {
+    width: 100%;
+    max-height: 500px;
+    object-fit: cover;
+    border-radius: 8px;
 }
 
-.add-comment-form {
+.post-stats {
     display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    border-top: 1px solid #efefef;
+    gap: 15px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #666;
 }
 
-.comment-input {
-    flex: 1;
-    border: none;
-    outline: none;
-    font-size: 14px;
+.post-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
     padding: 8px 0;
 }
 
-.comment-post-btn {
+.action-btn {
+    flex: 1;
     background: none;
     border: none;
-    color: #0095f6;
-    font-weight: 600;
+    padding: 8px;
+    border-radius: 4px;
     cursor: pointer;
-    opacity: 0.3;
+    font-size: 14px;
 }
 
-.comment-post-btn:not(:disabled) {
-    opacity: 1;
+.action-btn:hover {
+    background: #f8f9fa;
+}
+
+.quick-comment {
+    margin-top: 8px;
+}
+
+.comment-form {
+    display: flex;
+    gap: 8px;
+}
+
+.comment-form input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-size: 14px;
+}
+
+.comment-form button {
+    background: #0095f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.comment-form button:hover {
+    background: #007acc;
+}
+
+.no-posts {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+}
+
+.no-posts h3 {
+    margin-bottom: 10px;
+    color: #333;
 }
 
 /* Modal Styles */
 .modal {
     display: none;
     position: fixed;
-    z-index: 1000;
+    z-index: 2000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
     background-color: rgba(0,0,0,0.5);
+    backdrop-filter: blur(5px);
 }
 
-.instagram-modal {
+.create-post-modal {
     background-color: white;
     margin: 5% auto;
     border-radius: 12px;
-    width: 80%;
+    width: 90%;
     max-width: 500px;
     overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px;
+    padding: 20px;
     border-bottom: 1px solid #dbdbdb;
 }
 
 .modal-header h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
+    color: #262626;
 }
 
 .close {
-    color: #262626;
-    font-size: 24px;
+    color: #8e8e8e;
+    font-size: 28px;
     font-weight: bold;
     cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover {
+    color: #262626;
 }
 
 .modal-body {
-    padding: 40px 20px;
-    text-align: center;
-}
-
-.upload-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
-}
-
-.upload-section h4 {
-    margin: 0 0 20px 0;
-    color: #262626;
-    font-weight: 300;
-}
-
-.btn-select {
-    background: #0095f6;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.preview-section {
-    text-align: left;
-}
-
-#imagePreview {
-    width: 100%;
-    max-height: 300px;
-    object-fit: contain;
-    margin-bottom: 16px;
-}
-
-.caption-section {
-    position: relative;
-}
-
-.caption-section textarea {
-    width: 100%;
-    border: 1px solid #dbdbdb;
-    border-radius: 8px;
-    padding: 12px;
-    resize: vertical;
-    min-height: 80px;
-    font-family: inherit;
-}
-
-.char-count {
-    position: absolute;
-    bottom: 8px;
-    right: 12px;
-    color: #8e8e8e;
-    font-size: 12px;
+    padding: 20px;
 }
 
 .modal-footer {
     display: flex;
-    justify-content: space-between;
-    padding: 16px;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px;
     border-top: 1px solid #dbdbdb;
 }
 
-.btn-cancel {
-    background: none;
-    border: none;
+/* Create Post Form Styles */
+.create-post-form {
+    max-width: 100%;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
     color: #262626;
-    cursor: pointer;
-    font-weight: 600;
 }
 
-.btn-share {
-    background: #0095f6;
-    color: white;
-    border: none;
-    padding: 8px 16px;
+.file-upload-area {
+    display: block;
+    border: 2px dashed #dbdbdb;
     border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.btn-share:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-/* Floating Action Button */
-.fab {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(45deg, #405de6, #5851db, #833ab4, #c13584, #e1306c, #fd1d1d);
-    border: none;
-    border-radius: 50%;
-    color: white;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* No Posts State */
-.no-posts {
-    background: white;
-    border: 1px solid #dbdbdb;
-    border-radius: 8px;
-    padding: 60px 40px;
+    padding: 40px 20px;
     text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
-.no-posts-content h3 {
-    margin: 0 0 12px 0;
+.file-upload-area:hover {
+    border-color: #0095f6;
+    background: #f8f9fa;
+}
+
+.upload-placeholder .upload-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.upload-placeholder p {
+    margin: 0 0 5px 0;
+    font-weight: 600;
     color: #262626;
 }
 
-.no-posts-content p {
-    margin: 0 0 24px 0;
+.upload-placeholder small {
     color: #8e8e8e;
 }
 
-.btn-find-people {
+.image-preview {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.form-group textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #dbdbdb;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: vertical;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.char-count {
+    text-align: right;
+    font-size: 12px;
+    color: #8e8e8e;
+    margin-top: 5px;
+}
+
+/* Buttons */
+.btn-cancel {
+    background: #f8f9fa;
+    color: #262626;
+    border: 1px solid #dbdbdb;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.btn-cancel:hover {
+    background: #e9ecef;
+}
+
+.btn-post {
     background: #0095f6;
     color: white;
     border: none;
-    padding: 8px 16px;
+    padding: 10px 20px;
     border-radius: 8px;
     cursor: pointer;
+    font-size: 14px;
     font-weight: 600;
 }
+
+.btn-post:hover:not(:disabled) {
+    background: #007acc;
+}
+
+.btn-post:disabled {
+    background: #b2dffc;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+
+    .post-card {
+        padding: 12px;
+    }
+
+    .post-actions {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .action-btn {
+        text-align: left;
+    }
+
+    .floating-post-btn {
+        bottom: 20px;
+        right: 20px;
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+    }
+
+    .create-post-modal {
+        margin: 10% auto;
+        width: 95%;
+    }
+}
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const createPostForm = document.getElementById('createPostForm');
+    const postImageInput = document.getElementById('postImage');
+    const imagePreview = document.getElementById('imagePreview');
+    const postCaption = document.getElementById('postCaption');
+    const fileUploadArea = document.getElementById('fileUploadArea');
+    const postSubmitBtn = document.getElementById('postSubmitBtn');
+    const charCount = document.getElementById('charCount');
+
+    // Handle file upload area click
+    fileUploadArea.addEventListener('click', function(e) {
+        postImageInput.click();
+    });
+
+    // Handle drag and drop
+    fileUploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.style.borderColor = '#0095f6';
+        this.style.background = '#f0f8ff';
+    });
+
+    fileUploadArea.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        this.style.borderColor = '#dbdbdb';
+        this.style.background = '';
+    });
+
+    fileUploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.style.borderColor = '#dbdbdb';
+        this.style.background = '';
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            postImageInput.files = files;
+            handleImageSelection(files[0]);
+        }
+    });
+
+    // Handle image selection
+    postImageInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            handleImageSelection(file);
+        }
+    });
+
+    function handleImageSelection(file) {
+        if (!file.type.startsWith('image/')) {
+            alert('Please select an image file');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imagePreview.innerHTML = `
+                <div class="image-preview-content">
+                    <img src="${e.target.result}" alt="Preview">
+                    <button type="button" class="remove-image-btn" onclick="removeImage()">×</button>
+                </div>
+            `;
+            fileUploadArea.style.display = 'none';
+            updatePostButtonState();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Handle caption character count
+    postCaption.addEventListener('input', function() {
+        const count = this.value.length;
+        charCount.textContent = count;
+
+        if (count > 500) {
+            charCount.style.color = '#dc3545';
+        } else {
+            charCount.style.color = '#8e8e8e';
+        }
+
+        updatePostButtonState();
+    });
+
+    function updatePostButtonState() {
+        const hasImage = postImageInput.files.length > 0;
+        const captionValid = postCaption.value.length <= 500;
+        postSubmitBtn.disabled = !hasImage || !captionValid;
+    }
+
+    // Handle post creation
+    createPostForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const caption = postCaption.value.trim();
+        const imageFile = postImageInput.files[0];
+
+        if (!imageFile) {
+            alert('Please select an image');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('caption', caption);
+        formData.append('image', imageFile);
+
+        // Show loading state
+        postSubmitBtn.innerHTML = 'Posting...';
+        postSubmitBtn.disabled = true;
+
+        fetch('/create_post', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Post created successfully!');
+                closeCreatePostModal();
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+                postSubmitBtn.innerHTML = 'Post';
+                updatePostButtonState();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating post');
+            postSubmitBtn.innerHTML = 'Post';
+            updatePostButtonState();
+        });
+    });
+});
+
+function openCreatePostModal() {
+    document.getElementById('createPostModal').style.display = 'block';
+}
+
+function closeCreatePostModal() {
+    document.getElementById('createPostModal').style.display = 'none';
+    resetCreatePostForm();
+}
+
+function resetCreatePostForm() {
+    document.getElementById('createPostForm').reset();
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('fileUploadArea').style.display = 'block';
+    document.getElementById('charCount').textContent = '0';
+    document.getElementById('postSubmitBtn').innerHTML = 'Post';
+    document.getElementById('postSubmitBtn').disabled = true;
+}
+
+function removeImage() {
+    document.getElementById('postImage').value = '';
+    document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('fileUploadArea').style.display = 'block';
+    document.getElementById('postSubmitBtn').disabled = true;
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', function(e) {
+    const modal = document.getElementById('createPostModal');
+    if (e.target === modal) {
+        closeCreatePostModal();
+    }
+});
+
+function likePost(postUid) {
+    fetch(`/like_post/${postUid}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+function togglePost(postUid) {
+    fetch(`/toggle_post/${postUid}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error toggling post status');
+    });
+}
+</script>
 {% endblock %}
