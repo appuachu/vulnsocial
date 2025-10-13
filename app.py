@@ -306,7 +306,7 @@ def login():
 
         if user_exists:
             # VULNERABILITY: Timing attack - check password character by character
-            flash('User exists - try SQL injection payloads!', 'info')
+           
 
         # VULNERABILITY 6: Second-order SQL Injection
         # Store malicious input for later execution
