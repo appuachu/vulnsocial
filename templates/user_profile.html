@@ -72,20 +72,21 @@
             <h3>Posts ({{ posts_with_counts|length }})</h3>
             {% if posts_with_counts %}
             <div class="posts-grid">
-                {% for post_data in posts_with_counts %}
-                <div class="post-thumbnail">
-                    <img src="{{ url_for('static', filename='uploads/' + post_data.post.image_path) }}"
-                         alt="Post"
-                         onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+              {% for post_data in posts_with_counts %}
+<div class="post-thumbnail">
+    <img src="{{ url_for('static', filename='uploads/' + post_data.post.image_path) }}"
+         alt="Post"
+         onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
 
-                    <a href="{{ url_for('view_comments', post_id=post_data.post.id) }}" class="post-overlay-link">
-                        <div class="post-overlay">
-                            <span class="post-likes">❤️ {{ post_data.like_count }}</span>
-                            <span class="post-comments">💬 {{ post_data.comment_count }}</span>
-                        </div>
-                    </a>
-                </div>
-                {% endfor %}
+    <a href="{{ url_for('view_comments', post_uid=post_data.post.post_uid) }}" class="post-overlay-link">
+        <div class="post-overlay">
+            <span class="post-likes">❤️ {{ post_data.like_count }}</span>
+            <span class="post-comments">💬 {{ post_data.comment_count }}</span>
+        </div>
+    </a>
+    <!-- NO MANAGEMENT BUTTONS HERE - CORRECT -->
+</div>
+{% endfor %}
             </div>
             {% else %}
             <div class="no-posts">
