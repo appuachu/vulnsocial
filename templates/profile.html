@@ -95,32 +95,32 @@
         {% if can_view %}
             {% if posts_with_counts %}
             <div class="posts-grid">
-                {% for post_data in posts_with_counts %}
-                <div class="post-thumbnail">
-                    <img src="{{ url_for('static', filename='uploads/' + post_data.post.image_path) }}"
-                         alt="Post"
-                         onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
+              {% for post_data in posts_with_counts %}
+<div class="post-thumbnail">
+  <img src="{{ url_for('static', filename='uploads/' + post_data.post.image_path) }}"
+       alt="Post"
+       onerror="this.src='{{ url_for('static', filename='images/default-post.jpg') }}'">
 
-                    <!-- FIXED: Use post_uid instead of post_id -->
-                    <a href="{{ url_for('view_comments', post_uid=post_data.post.post_uid) }}" class="post-overlay-link">
-                        <div class="post-overlay">
-                            <span class="post-likes">❤️ {{ post_data.like_count }}</span>
-                            <span class="post-comments">💬 {{ post_data.comment_count }}</span>
-                        </div>
-                    </a>
+  <a href="{{ url_for('view_comments', post_uid=post_data.post.post_uid) }}" class="post-overlay-link">
+      <div class="post-overlay">
+          <span class="post-likes">❤️ {{ post_data.like_count }}</span>
+          <span class="post-comments">💬 {{ post_data.comment_count }}</span>
+      </div>
+  </a>
 
-                    <div class="post-management">
-                        <!-- FIXED: Use post_uid instead of post_id -->
-                        <button onclick="togglePost('{{ post_data.post.post_uid }}')" class="btn-toggle">
-                            {% if post_data.post.is_active %}Disable{% else %}Enable{% endif %}
-                        </button>
-                        <!-- FIXED: Use post_uid instead of post_id -->
-                        <a href="{{ url_for('delete_post', post_uid=post_data.post.post_uid) }}"
-                           class="btn-delete"
-                           onclick="return confirm('Delete this post permanently?')">Delete</a>
-                    </div>
-                </div>
-                {% endfor %}
+  <!-- ADD THIS CONDITION: Only show management buttons for own posts -->
+  {% if is_own_profile %}
+  <div class="post-management">
+      <button onclick="togglePost('{{ post_data.post.post_uid }}')" class="btn-toggle">
+          {% if post_data.post.is_active %}Disable{% else %}Enable{% endif %}
+      </button>
+      <a href="{{ url_for('delete_post', post_uid=post_data.post.post_uid) }}"
+         class="btn-delete"
+         onclick="return confirm('Delete this post permanently?')">Delete</a>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
             </div>
             {% else %}
             <div class="no-posts">
