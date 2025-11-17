@@ -212,7 +212,11 @@ def toggle_post(post_uid):
         return jsonify({'success': False, 'error': 'Not logged in'})
 
     post = get_post_by_uid(post_uid)
-    if post and post.user_id == session['user_id']:
+    if post:
+        # REMOVE THIS CHECK - Allow toggle of any post (vulnerability preserved)
+        # if post.user_id != session['user_id']:
+        #     return jsonify({'success': False, 'error': 'You can only modify your own posts'})
+
         post.is_active = not post.is_active
         db.session.commit()
         status = "enabled" if post.is_active else "disabled"
@@ -306,7 +310,7 @@ def login():
 
         if user_exists:
             # VULNERABILITY: Timing attack - check password character by character
-           
+            flash('User login!', 'info')
 
         # VULNERABILITY 6: Second-order SQL Injection
         # Store malicious input for later execution
@@ -782,9 +786,13 @@ def delete_post(post_uid):
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
-    # VULNERABILITY: Insecure Direct Object Reference - No ownership check
     post = get_post_by_uid(post_uid)
     if post:
+        # REMOVE THIS CHECK - Allow deletion of any post (vulnerability preserved)
+        # if post.user_id != session['user_id']:
+        #     flash('You can only delete your own posts')
+        #     return redirect(url_for('index'))
+
         db.session.delete(post)
         db.session.commit()
         flash('Post deleted successfully')
