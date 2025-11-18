@@ -48,8 +48,8 @@
                     </td>
                     <td class="action-buttons">
                         {% if not user.is_admin %}
-                            <button onclick="showResetPassword({{ user.id }}, '{{ user.username }}')"
-                                    class="btn-reset">Reset Password</button>
+                            <!-- <button onclick="showResetPassword({{ user.id }}, '{{ user.username }}')"
+                                    class="btn-reset">Reset Password</button> -->
                             <a href="{{ url_for('admin_toggle_user_status', user_id=user.id) }}"
                                class="btn-toggle">Toggle Privacy</a>
                             <a href="{{ url_for('admin_delete_user', user_id=user.id) }}"
